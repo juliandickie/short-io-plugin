@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "short-io": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/run-mcp.mjs"],
+      "env": {
+        "SHORT_IO_API_KEY": "${user_config.short_io_api_key}",
+        "SHORT_IO_KEY_OP_REF": "${user_config.short_io_key_op_ref}",
+        "SHORT_IO_OP_ACCOUNT": "${user_config.short_io_op_account}",
+        "SHORT_IO_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "CLAUDE_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+      }
+    }
+  }
+}
