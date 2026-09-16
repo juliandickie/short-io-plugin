@@ -31,3 +31,43 @@ test('checkSlug verdicts - ok, mismatch, free, free-but-redirects', async () => 
   const freeRedir = await checkSlug({ expand: async () => null }, { domain: 'go.example.com', path: 'gone' }, { fetch: fetcher({ 'https://go.example.com/gone': answer(302, 'https://example.com/') }), random });
   assert.equal(freeRedir.verdict, 'free-but-redirects');
 });
+
+test('checkSlug reports not-resolving for a configured slug that does not redirect', async () => {
+  const random = () => 'zz-probe-1';
+  const client = { expand: async () => ({ idString: 'link_1', originalURL: 'https://example.com/spring-sale' }) };
+  const gone = await checkSlug(client, { domain: 'go.example.com', path: 'spring' }, { fetch: fetcher({}), random });
+  assert.equal(gone.verdict, 'not-resolving'); assert.equal(gone.live.status, 404);
+  const broken = await checkSlug(client, { domain: 'go.example.com', path: 'spring' }, { fetch: fetcher({ 'https://go.example.com/spring': answer(503) }), random });
+  assert.equal(broken.verdict, 'not-resolving'); assert.equal(broken.live.status, 503);
+});
+
+test('a thrown fetch becomes status 0 with an error string instead of rejecting', async () => {
+  const random = () => 'zz-probe-1';
+  const boom = async (url, init) => {
+    assert.equal(init.redirect, 'manual');
+    if (url === 'https://go.example.com/spring') throw Object.assign(new Error('boom'), { name: 'TimeoutError' });
+    return answer(404);
+  };
+  const live = await probeLive(boom, 'https://go.example.com/spring');
+  assert.equal(live.status, 0); assert.equal(live.location, null); assert.match(live.error, /boom/);
+
+  const failAll = async () => { throw Object.assign(new Error('boom'), { name: 'TimeoutError' }); };
+  const fb = await probeFallback(failAll, 'go.example.com', { random });
+  assert.equal(fb.hasFallback, false); assert.equal(fb.status, 0); assert.match(fb.error, /boom/);
+
+  const configured = await checkSlug({ expand: async () => ({ idString: 'l', originalURL: 'https://example.com/x' }) }, { domain: 'go.example.com', path: 'spring' }, { fetch: boom, random });
+  assert.equal(configured.live.status, 0); assert.match(configured.live.error, /boom/); assert.equal(configured.verdict, 'not-resolving');
+
+  const free = await checkSlug({ expand: async () => null }, { domain: 'go.example.com', path: 'spring' }, { fetch: boom, random });
+  assert.equal(free.verdict, 'free');
+});
+
+test('checkSlug reuses a known fallback instead of probing again', async () => {
+  let calls = 0;
+  const counted = async (url, init) => { calls += 1; assert.equal(init.redirect, 'manual'); return answer(302, 'https://example.com/spring-sale'); };
+  const known = { hasFallback: true, status: 302, location: 'https://example.com/', probedPath: 'x' };
+  const out = await checkSlug({ expand: async () => ({ idString: 'l', originalURL: 'https://example.com/spring-sale' }) }, { domain: 'go.example.com', path: 'spring' }, { fetch: counted, fallback: known });
+  assert.equal(calls, 1);
+  assert.equal(out.fallback, known);
+  assert.equal(out.verdict, 'ok');
+});

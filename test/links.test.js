@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTarget, resolveDomain, listAllLinks, classifyCreate, createOne, deleteBySlug, normaliseTags, STALE_MS } from '../lib/links.mjs';
+import { parseTarget, resolveDomain, listAllLinks, classifyCreate, createOne, deleteBySlug, normaliseTags, sameUrl, STALE_MS } from '../lib/links.mjs';
 import { ShortIoError } from '../lib/client.mjs';
 
 const DOMAINS = [{ id: 12345, hostname: 'go.example.com', linkType: 'eight-char', redirect404: null }];
@@ -126,4 +126,10 @@ test('listAllLinks refuses to loop on a repeated page token', async () => {
 test('resolveDomain fails loud when listDomains is not an array', async () => {
   const c = fake({ listDomains: async () => ({ domains: [] }) });
   await assert.rejects(resolveDomain(c, 'go.example.com'), (e) => e instanceof ShortIoError && e.code === 'unknown' && /array/.test(e.message));
+});
+
+test('sameUrl ignores the hash but not a trailing slash', () => {
+  assert.equal(sameUrl('https://example.com', 'https://example.com/#top'), true);
+  assert.equal(sameUrl('https://example.com/x/', 'https://example.com/x'), false);
+  assert.equal(sameUrl('not a url', 'not a url'), true);
 });
