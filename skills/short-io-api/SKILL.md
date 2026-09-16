@@ -61,10 +61,11 @@ existing record is reported as `exists`, never as `created`.
 ## Live redirect behaviour
 
 On a domain with a default fallback configured, fetching `https://<domain>/<slug>` without
-following redirects answers 302 to the fallback for an unknown slug AND for a real one. The
+following redirects answers 302 to the fallback for an unknown slug AND for a real one. Some
+domains serve a 200 page instead of redirecting, which hides a typo just as thoroughly. The
 status code, and often the redirect target, cannot tell a working link from a typo. The CLI
 `check` command reports the configured destination first, then the live answer, then probes
-one random unused slug to say whether the domain 404s or falls back.
+one random unused slug and names exactly what came back.
 
 ## Error body shapes
 
@@ -145,9 +146,16 @@ Exit codes - 0 ok, 1 API or network error, 2 configuration or usage. `create` ad
 returns 0 for the actions `created` and `exists`, and 1 for `taken`, `duplicate` and
 `invalid`. `bulk create` returns 1 when any row failed.
 
-`check` verdicts - `ok`, `free`, `free-but-redirects`, `mismatch`, `not-resolving`. An `ok`
-verdict may carry a `served` note of `redirect`, `cloaked` or `password`, because cloaked and
-password-protected links answer 2xx with a page of their own instead of redirecting.
+`check` verdicts - six of them, `ok`, `free`, `free-but-redirects`, `free-but-served`,
+`mismatch`, `not-resolving`. An `ok` verdict may carry a `served` note of `redirect`,
+`cloaked` or `password`, because cloaked and password-protected links answer 2xx with a page
+of their own instead of redirecting. With no record behind the slug, a live redirect reads as
+`free-but-redirects`, a live 2xx as `free-but-served`, and a 404, any other status, or a
+failed probe as plain `free`.
+
+The fallback probe reports a `kind` of `notfound`, `redirect`, `page`, `other` or `error`,
+and `hasFallback` is true for `redirect` and `page` alike - a domain that answers a page for
+an unknown slug has no 404 either, so a typo fails just as silently there.
 
 `bulk create` result CSV columns - `row,url,path,action,short_url,id,note`.
 

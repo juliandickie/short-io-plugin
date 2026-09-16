@@ -59,6 +59,16 @@ test('check prints configured destination, live hop, fallback and verdict', asyn
   assert.match(f.out.join(''), /free/); assert.match(f.out.join(''), /fallback/i);
 });
 
+test('check names what unknown slugs actually answer, a 200 page as well as a 404', async () => {
+  const page = ctx({ ctx: { fetch: async () => ({ status: 200, headers: { get: () => null } }) } });
+  assert.equal(await run(['check', 'go.example.com/nope'], page.c), 0);
+  assert.match(page.out.join(''), /HTTP 200 with a page/);
+  assert.equal(page.out.join('').includes('answer 404'), false);
+  const missing = ctx({ ctx: { fetch: async () => ({ status: 404, headers: { get: () => null } }) } });
+  assert.equal(await run(['check', 'go.example.com/nope'], missing.c), 0);
+  assert.match(missing.out.join(''), /answer 404/);
+});
+
 test('create makes a link and reports exists/taken/duplicate without exit 1', async () => {
   const h = ctx(); assert.equal(await run(['create', 'go.example.com', 'https://example.com/z', '--path', 'z', '--tags', 'a,b', '--json'], h.c), 0);
   assert.equal(JSON.parse(h.out.join('')).action, 'created');

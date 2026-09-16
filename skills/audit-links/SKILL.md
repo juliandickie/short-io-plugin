@@ -50,15 +50,18 @@ Five lines come back. The first is the `domain/slug` header, then four fields.
 - `configured` - the destination Short.io holds for that slug, or `FREE (no link with this
   slug)`.
 - `live` - the HTTP status from the short domain and the redirect target, if any.
-- `fallback` - whether unknown slugs on this domain answer 404 or redirect somewhere, probed
-  with one random unused slug.
+- `fallback` - what unknown slugs on this domain actually answer, probed with one random
+  unused slug. Five outcomes - a 404 (the only answer that proves a typo fails loudly), a
+  redirect to the domain's fallback, an HTTP 200 page, some other status, or a probe that
+  could not reach the domain at all. A redirect and a 200 page are both silent failures.
 - `verdict` - the summary.
 
 | Verdict | Meaning |
 |---|---|
 | `ok` | A link exists and it behaves as configured. It always carries a `served` note saying how, `(served as a redirect)` on an ordinary link whose live hop matches the configured destination, and `(served as a cloaked)` or `(served as a password)` where the link answers 2xx with a page of its own instead of redirecting, which for those links is correct. |
-| `free` | No link with that slug, and the domain 404s, so the slug is genuinely available. |
+| `free` | No link with that slug, and the live answer was a 404, some other status the domain chose, or a probe that failed outright, so nothing is serving it and the slug is available. |
 | `free-but-redirects` | No link with that slug, but the domain redirects anyway because of the fallback. The slug is still available; the redirect is the fallback, not a link. |
+| `free-but-served` | No link with that slug, but the domain answers 2xx with a page anyway. The slug is still available; the page is the fallback, not a link. |
 | `mismatch` | A link exists but the live hop goes somewhere other than the configured destination. |
 | `not-resolving` | A link exists but the domain does not serve it. |
 

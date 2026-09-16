@@ -29,8 +29,8 @@ Once the plugin is listed in the loadout and outfit catalogues (from v0.1.0):
 /short-io:setup
 ```
 
-Status - this repository is published at release, so until then neither catalogue lists the
-plugin and the direct form below is the one that works.
+Status - this repository is listed in those catalogues at release, so until then neither
+catalogue lists the plugin and the direct form below is the one that works.
 
 ```
 /plugin marketplace add juliandickie/short-io-plugin
@@ -155,8 +155,11 @@ after a timeout without checking first whether it already landed.
 
 Exit codes are 0 ok, 1 API or network error, 2 configuration or usage. `create` returns 0 for
 `created` and `exists` and 1 for `taken`, `duplicate` and `invalid`. `bulk create` returns 1
-when any row failed. `check` verdicts are `ok`, `free`, `free-but-redirects`, `mismatch` and
-`not-resolving`, and an `ok` may carry a `served` note of `redirect`, `cloaked` or `password`.
+when any row failed. `check` has six verdicts, `ok`, `free`, `free-but-redirects`,
+`free-but-served`, `mismatch` and `not-resolving`, and an `ok` may carry a `served` note of
+`redirect`, `cloaked` or `password`. `free` means nothing is serving the slug (the live answer
+was a 404, another status, or a probe that failed); `free-but-redirects` and `free-but-served`
+mean the slug is unclaimed but the domain answers anyway, by redirect or by a 200 page.
 The bulk results CSV columns are `row,url,path,action,short_url,id,note`.
 
 ## Skills

@@ -13,9 +13,28 @@ test('probeLive reports the first hop without following', async () => {
 test('probeFallback says whether an unknown slug is redirected', async () => {
   const random = () => 'zz-probe-1';
   const yes = await probeFallback(fetcher({ 'https://go.example.com/zz-probe-1': answer(302, 'https://example.com/') }), 'go.example.com', { random });
-  assert.deepEqual(yes, { hasFallback: true, status: 302, location: 'https://example.com/', probedPath: 'zz-probe-1' });
+  assert.deepEqual(yes, { kind: 'redirect', hasFallback: true, status: 302, location: 'https://example.com/', probedPath: 'zz-probe-1' });
   const no = await probeFallback(fetcher({}), 'go.example.com', { random });
-  assert.equal(no.hasFallback, false); assert.equal(no.status, 404);
+  assert.equal(no.hasFallback, false); assert.equal(no.status, 404); assert.equal(no.kind, 'notfound');
+});
+
+test('probeFallback reads a 200 page as a fallback, and a 5xx as neither', async () => {
+  const random = () => 'zz-probe-1';
+  const page = await probeFallback(fetcher({ 'https://go.example.com/zz-probe-1': answer(200) }), 'go.example.com', { random });
+  assert.equal(page.kind, 'page'); assert.equal(page.hasFallback, true); assert.equal(page.status, 200);
+  const other = await probeFallback(fetcher({ 'https://go.example.com/zz-probe-1': answer(503) }), 'go.example.com', { random });
+  assert.equal(other.kind, 'other'); assert.equal(other.hasFallback, false);
+  const failAll = async () => { throw new Error('boom'); };
+  const bad = await probeFallback(failAll, 'go.example.com', { random });
+  assert.equal(bad.kind, 'error'); assert.equal(bad.hasFallback, false);
+});
+
+test('an absent record that still serves a page is free-but-served, and a 5xx is free', async () => {
+  const random = () => 'zz-probe-1';
+  const served = await checkSlug({ expand: async () => null }, { domain: 'go.example.com', path: 'gone' }, { fetch: fetcher({ 'https://go.example.com/gone': answer(200) }), random });
+  assert.equal(served.verdict, 'free-but-served'); assert.equal(served.configured, null);
+  const broken = await checkSlug({ expand: async () => null }, { domain: 'go.example.com', path: 'gone' }, { fetch: fetcher({ 'https://go.example.com/gone': answer(503), 'https://go.example.com/zz-probe-1': answer(503) }), random });
+  assert.equal(broken.verdict, 'free'); assert.equal(broken.fallback.kind, 'other');
 });
 
 test('checkSlug verdicts - ok, mismatch, free, free-but-redirects', async () => {

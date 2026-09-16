@@ -42,8 +42,8 @@ The `action` field in the JSON is the whole answer. Exit code 0 covers `created`
 ## 4 UTM and A and B fields
 
 The CLI does not carry UTM, split-test, device or expiry flags in v0.1. When the user wants
-any of those, confirm the slug is available first with `check` (a verdict of `free` or
-`free-but-redirects` means nothing holds it), then make the link with the hosted
+any of those, confirm the slug is available first with `check` (a verdict of `free`,
+`free-but-redirects` or `free-but-served` means nothing holds it), then make the link with the hosted
 `create-short-link` tool, passing `domain` as the hostname plus `originalURL`,
 `path`, `title`, `tags`, and whichever of `utmSource`, `utmMedium`, `utmCampaign`, `utmTerm`,
 `utmContent`, `splitURL`, `splitPercent`, `androidURL`, `iphoneURL`, `expiresAt`,
