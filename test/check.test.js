@@ -71,3 +71,20 @@ test('checkSlug reuses a known fallback instead of probing again', async () => {
   assert.equal(out.fallback, known);
   assert.equal(out.verdict, 'ok');
 });
+
+test('cloaked and password-protected links serve 200 and still count as ok', async () => {
+  const random = () => 'zz-probe-1';
+  const f = fetcher({ 'https://go.example.com/spring': answer(200) });
+  const cloaked = await checkSlug({ expand: async () => ({ idString: 'l', originalURL: 'https://example.com/x', cloaking: true }) }, { domain: 'go.example.com', path: 'spring' }, { fetch: f, random });
+  assert.equal(cloaked.verdict, 'ok'); assert.equal(cloaked.served, 'cloaked');
+  const locked = await checkSlug({ expand: async () => ({ idString: 'l', originalURL: 'https://example.com/x', hasPassword: true }) }, { domain: 'go.example.com', path: 'spring' }, { fetch: f, random });
+  assert.equal(locked.verdict, 'ok'); assert.equal(locked.served, 'password');
+  const plain = await checkSlug({ expand: async () => ({ idString: 'l', originalURL: 'https://example.com/x' }) }, { domain: 'go.example.com', path: 'spring' }, { fetch: f, random });
+  assert.equal(plain.verdict, 'not-resolving'); assert.equal(plain.served, null);
+});
+
+test('a redirect with no Location header is not-resolving', async () => {
+  const random = () => 'zz-probe-1';
+  const out = await checkSlug({ expand: async () => ({ idString: 'l', originalURL: 'https://example.com/x' }) }, { domain: 'go.example.com', path: 'spring' }, { fetch: fetcher({ 'https://go.example.com/spring': answer(302) }), random });
+  assert.equal(out.verdict, 'not-resolving'); assert.equal(out.served, null);
+});

@@ -128,8 +128,9 @@ test('resolveDomain fails loud when listDomains is not an array', async () => {
   await assert.rejects(resolveDomain(c, 'go.example.com'), (e) => e instanceof ShortIoError && e.code === 'unknown' && /array/.test(e.message));
 });
 
-test('sameUrl ignores the hash but not a trailing slash', () => {
-  assert.equal(sameUrl('https://example.com', 'https://example.com/#top'), true);
+test('sameUrl compares normalised URLs with the fragment significant', () => {
+  assert.equal(sameUrl('https://example.com', 'https://example.com/'), true);
+  assert.equal(sameUrl('https://example.com/x', 'https://example.com/x#top'), false);
   assert.equal(sameUrl('https://example.com/x/', 'https://example.com/x'), false);
   assert.equal(sameUrl('not a url', 'not a url'), true);
 });
