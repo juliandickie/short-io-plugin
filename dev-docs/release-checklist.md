@@ -9,9 +9,17 @@
 4. Commit on main. Pushing, tagging (`vX.Y.Z`, annotated), and listing in the outfit and
    ai-loadout catalogues (both marketplace.json files and both README tables, same order)
    are separate actions each needing the maintainer's go.
-5. After a listing change, reinstall locally and confirm the cache version, then run
-   `short-io whoami` from a terminal session and confirm the MCP tools appear (desktop
-   sessions may not spawn plugin servers).
-6. Release smoke - one real slug through `short-io create`, then `check`, then `delete` on the
-   maintainer's account, recorded in `dev-docs/smoke-<date>.md` with the account identifiers
-   redacted.
+5. After a listing change, reinstall locally and confirm the cache version, then run the
+   installed CLI from a terminal session and confirm the MCP tools appear (desktop sessions
+   may not spawn plugin servers). The CLI is not on PATH, and the cache path rotates with
+   every version and session, so glob it at run time and never pin it.
+
+   ```bash
+   "$(ls -d ~/.claude/plugins/cache/*/short-io/*/ | tail -1)bin/short-io" whoami
+   ```
+
+   Inside a Claude Code session the same command is
+   `${CLAUDE_PLUGIN_ROOT}/bin/short-io whoami`.
+6. Release smoke - one real slug through `${CLAUDE_PLUGIN_ROOT}/bin/short-io create`, then
+   `check`, then `delete` on the maintainer's account, recorded in
+   `dev-docs/smoke-<date>.md` with the account identifiers redacted.

@@ -21,18 +21,21 @@ commands here.
 
 ## Install
 
+Once the plugin is listed in the loadout and outfit catalogues (from v0.1.0):
+
 ```
 /plugin marketplace add juliandickie/ai-loadout
 /plugin install short-io@loadout
 /short-io:setup
 ```
 
-Installing straight from this repository's own marketplace works too, and is the same two
-commands with this marketplace name in place of `loadout`.
+Status - this repository is published at release, so until then neither catalogue lists the
+plugin and the direct form below is the one that works.
 
 ```
 /plugin marketplace add juliandickie/short-io-plugin
 /plugin install short-io@short-io-plugin
+/short-io:setup
 ```
 
 One copy is enough. Installing from two marketplaces gives you two copies of the same skills.
@@ -173,7 +176,7 @@ The bulk results CSV columns are `row,url,path,action,short_url,id,note`.
 - Short.io identifies a domain two ways and the surfaces disagree. `create-short-link` and the
   REST API take `domain` as a hostname string; `get-link-list` and every statistics tool take
   the numeric `domainId`. A link is identified by its `idString`, not by its slug. Run
-  `short-io domains` once and carry both.
+  `${CLAUDE_PLUGIN_ROOT}/bin/short-io domains` once and carry both.
 - The search parameter on `search-links` is `q`, not `query`.
 - Any unknown property sent to a hosted MCP tool answers HTTP 500, so send only the documented
   arguments.
@@ -207,6 +210,9 @@ The bulk results CSV columns are `row,url,path,action,short_url,id,note`.
 npm test                    # node --test test/*.test.js
 claude plugin validate .
 ```
+
+`npm test` is the gate for behaviour. `claude plugin validate .` validates the plugin and
+marketplace manifests, nothing more.
 
 ESM, Node 22 or newer, built-ins only, no runtime dependencies beyond the pinned `mcp-remote`
 the hook installs. Every module in `lib/` takes its side effects (fs, exec, fetch, clock) as

@@ -29,7 +29,8 @@ bridge, or the packaging never spills into the others.
 There is no build step, the plugin runs directly from source under Node >=22 in ESM mode with
 zero runtime dependencies beyond the pinned `mcp-remote` the SessionStart hook installs.
 `npm test` runs `node --test test/*.test.js` for the unit and integration tests, and
-`claude plugin validate .` checks the plugin manifest, hook, and skill structure. Every module
+`claude plugin validate .` validates the plugin and marketplace manifests, and nothing beyond
+them, so `npm test` is the gate for behavior. Every module
 in `lib/` takes its side effects (fs, exec, fetch, clock) as injectable parameters and is unit
 tested without network access. Both gates are expected to pass before any commit that touches
 plugin behavior.

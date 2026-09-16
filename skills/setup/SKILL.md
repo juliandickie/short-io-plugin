@@ -1,6 +1,6 @@
 ---
 name: setup
-description: First-run setup for the Short.io plugin - create a SECRET API key, choose how it is supplied (plugin config field, SHORT_IO_API_KEY, the 0600 config file for unattended use, or a 1Password reference), remove a stale user-scope MCP entry so tools do not double up, then verify with short-io whoami.
+description: First-run setup for the Short.io plugin - create a SECRET API key, choose how it is supplied (SHORT_IO_API_KEY or the plugin config field, the 0600 config file for unattended use, or a 1Password reference), remove a stale user-scope MCP entry so tools do not double up, then verify with the plugin's short-io whoami.
 disable-model-invocation: true
 argument-hint: ""
 ---
