@@ -92,3 +92,38 @@ test('API errors exit 1 with the message and config errors exit 2', async () => 
   const c = ctx({ ctx: { resolveKey: async () => { throw new ConfigError('pk_ key'); } } });
   assert.equal(await run(['domains'], c.c), 2);
 });
+
+test('bulk create dry run emits JSON under --json and writes nothing', async () => {
+  const h = ctx(); h.files['/in.csv'] = 'url,path\nhttps://example.com/1,one\nhttps://example.com/2,two\n';
+  assert.equal(await run(['bulk', 'create', '/in.csv', '--domain', 'go.example.com', '--json'], h.c), 0);
+  const j = JSON.parse(h.out.join(''));
+  assert.equal(j.dry_run, true); assert.equal(j.rows, 2); assert.equal(j.counts.create, 2);
+  assert.equal(j.domain, 'go.example.com'); assert.equal(j.items.length, 2);
+  assert.equal(j.items[0].path, 'one'); assert.equal(j.items[0].existing, null);
+  assert.equal(Object.keys(h.files).length, 1);
+});
+
+test('a missing input file is a usage error, not a stack dump', async () => {
+  const h = ctx();
+  assert.equal(await run(['bulk', 'create', '/nope.csv', '--domain', 'go.example.com'], h.c), 2);
+  const err = h.err.join('');
+  assert.match(err, /no such file/); assert.match(err, /nope\.csv/);
+  assert.equal(err.includes('    at '), false);
+});
+
+test('an unexpected error prints its message only, with the stack behind SHORT_IO_DEBUG', async () => {
+  const h = ctx({ client: { listDomains: async () => { throw new Error('boom'); } } });
+  assert.equal(await run(['domains'], h.c), 1);
+  assert.match(h.err.join(''), /boom/); assert.equal(h.err.join('').includes('    at '), false);
+  const d = ctx({ client: { listDomains: async () => { throw new Error('boom'); } }, ctx: { env: { SHORT_IO_DEBUG: '1' } } });
+  assert.equal(await run(['domains'], d.c), 1);
+  assert.equal(d.err.join('').includes('    at '), true);
+});
+
+test('a results file that cannot be written still reports the counts and exits 1', async () => {
+  const h = ctx({ ctx: { writeFile: async () => { throw new Error('EROFS: read-only file system'); } } });
+  h.files['/in.csv'] = 'url,path\nhttps://example.com/1,one\n';
+  assert.equal(await run(['bulk', 'create', '/in.csv', '--domain', 'go.example.com', '--yes'], h.c), 1);
+  const err = h.err.join('');
+  assert.match(err, /created\s+1/); assert.match(err, /cannot write \/in-results\.csv/); assert.match(err, /read-only file system/);
+});
