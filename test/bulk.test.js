@@ -47,3 +47,55 @@ test('runBulk records an API failure on the row and continues', async () => {
   assert.deepEqual(out.counts, { created: 1, skipped: 0, failed: 1 });
   assert.match(out.results[0].note, /HTTP 500/);
 });
+
+test('loadSpecs numbers rows by physical line, not by position', () => {
+  const specs = loadSpecs('url,path\n\nhttps://a.example/,a\n', { format: 'csv' });
+  assert.equal(specs.length, 1);
+  assert.equal(specs[0].row, 3);
+});
+
+test('runBulk reuses the plan verdict and makes no further lookup calls', async () => {
+  let lookups = 0;
+  const c = fake({
+    expand: async () => { lookups++; return null; },
+    linksByUrl: async () => { lookups++; return []; },
+  });
+  const plan = await planBulk(c, [{ url: 'https://example.com/a', path: 'a', row: 2 }, { url: 'https://example.com/b', path: 'b', row: 3 }], { domain: 'go.example.com' });
+  const before = lookups;
+  assert.ok(before > 0);
+  const out = await runBulk(c, plan, { domain: 'go.example.com', sleep: async () => {} });
+  assert.equal(lookups, before);
+  assert.deepEqual(out.counts, { created: 2, skipped: 0, failed: 0 });
+});
+
+test('a duplicate row is skipped unless allowDuplicate is set', async () => {
+  const specs = [{ url: 'https://example.com/dup', path: 'fresh', row: 2 }];
+  let posted = 0;
+  const c = fake({ createLink: async (b) => { posted++; return { idString: 'link_f', path: b.path, shortURL: 'https://go.example.com/fresh', createdAt: new Date().toISOString() }; } });
+  const plan = await planBulk(c, specs, { domain: 'go.example.com' });
+  const off = await runBulk(c, plan, { domain: 'go.example.com', sleep: async () => {} });
+  assert.deepEqual(off.counts, { created: 0, skipped: 1, failed: 0 });
+  assert.equal(posted, 0);
+  assert.match(off.results[0].note, /already shortened as older/);
+  const on = await runBulk(c, plan, { domain: 'go.example.com', allowDuplicate: true, sleep: async () => {} });
+  assert.deepEqual(on.counts, { created: 1, skipped: 0, failed: 0 });
+  assert.equal(posted, 1);
+});
+
+test('runBulk notes are honest per outcome and onItem fires for every row', async () => {
+  const seen = [];
+  const specs = [
+    { url: 'https://example.com/new', path: 'new', row: 2 }, { url: 'nope', path: 'bad', row: 3 },
+    { url: 'https://example.com/new', path: 'new', row: 4 },
+  ];
+  const plan = await planBulk(fake(), specs, { domain: 'go.example.com' });
+  const out = await runBulk(fake(), plan, { domain: 'go.example.com', sleep: async () => {}, onItem: async (r) => { seen.push(r.row); } });
+  assert.deepEqual(seen, [2, 3, 4]);
+  assert.equal(out.results[2].note, 'duplicate of row 2 in this file');
+});
+
+test('runBulk survives being called with no options object', async () => {
+  const plan = await planBulk(fake(), [{ url: 'nope', path: 'bad', row: 2 }], { domain: 'go.example.com' });
+  const out = await runBulk(fake(), plan);
+  assert.deepEqual(out.counts, { created: 0, skipped: 1, failed: 0 });
+});

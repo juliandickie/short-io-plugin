@@ -134,3 +134,19 @@ test('sameUrl compares normalised URLs with the fragment significant', () => {
   assert.equal(sameUrl('https://example.com/x/', 'https://example.com/x'), false);
   assert.equal(sameUrl('not a url', 'not a url'), true);
 });
+
+test('createOne uses a supplied verdict instead of re-classifying', async () => {
+  const seen = [];
+  const c = fake({ expand: async () => { seen.push('expand'); return null; }, linksByUrl: async () => { seen.push('linksByUrl'); return []; } });
+  const out = await createOne(c, { domain: 'go.example.com', originalURL: 'https://example.com/a', path: 'a' }, { verdict: { action: 'create', known: [] }, now: () => new Date('2026-09-16T00:00:09.000Z') });
+  assert.equal(out.action, 'created');
+  assert.deepEqual(seen, []);
+});
+
+test('a supplied duplicate verdict short-circuits without a POST', async () => {
+  let posted = 0;
+  const c = fake({ createLink: async () => { posted++; return { idString: 'x' }; } });
+  const out = await createOne(c, { domain: 'go.example.com', originalURL: 'https://example.com/a' }, { verdict: { action: 'duplicate', known: ['link_d'] } });
+  assert.equal(out.action, 'duplicate');
+  assert.equal(posted, 0);
+});

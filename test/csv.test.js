@@ -12,3 +12,9 @@ test('parseCsv handles quotes, embedded commas, CRLF and a header row', () => {
 test('toCsv quotes what needs quoting', () => {
   assert.equal(toCsv(['a', 'b'], [{ a: 'x,y', b: 'say "hi"' }]), 'a,b\n"x,y","say ""hi"""\n');
 });
+
+test('parseCsv reports the physical line of each row, skipping blank lines', () => {
+  const { rows, lines } = parseCsv('url,path\n\nhttps://a.example/,a\n');
+  assert.equal(rows.length, 1);
+  assert.deepEqual(lines, [3]);
+});
