@@ -21,7 +21,7 @@ commands here.
 
 ## Install
 
-Once the plugin is listed in the loadout and outfit catalogues (from v0.1.0):
+Listed in the loadout and outfit catalogues since v0.1.0 (16 September 2026):
 
 ```
 /plugin marketplace add juliandickie/ai-loadout
@@ -29,8 +29,7 @@ Once the plugin is listed in the loadout and outfit catalogues (from v0.1.0):
 /short-io:setup
 ```
 
-Status - this repository is listed in those catalogues at release, so until then neither
-catalogue lists the plugin and the direct form below is the one that works.
+Or install straight from this repository, which carries its own single-plugin marketplace:
 
 ```
 /plugin marketplace add juliandickie/short-io-plugin
