@@ -12,10 +12,14 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dataDir } from '../lib/config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
-const DATA = process.env.SHORT_IO_PLUGIN_DATA ?? '/tmp/sio-data';
+// The real plugin data dir by default (dataDir already honours SHORT_IO_PLUGIN_DATA and
+// CLAUDE_PLUGIN_DATA, so an explicit override still wins). Never a predictable world-writable
+// path - run-mcp.mjs execs proxy.js out of whatever this resolves to.
+const DATA = dataDir({ env: process.env });
 const PROTOCOL_VERSION = '2025-06-18';
 const CLIENT_INFO = { name: 'short-io-bridge-smoke', version: '0.1.0' };
 const STARTUP_MS = 45000;

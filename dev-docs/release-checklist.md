@@ -16,8 +16,11 @@
    exit 0. It prints no ids and no key, so the output goes straight into the smoke record.
 
    ```bash
-   SHORT_IO_PLUGIN_DATA=/tmp/sio-data node scripts/bridge-smoke.mjs
+   node scripts/bridge-smoke.mjs
    ```
+
+   It uses the real plugin data dir unless `SHORT_IO_PLUGIN_DATA` says otherwise, so the
+   `mcp-remote` it runs is the one the SessionStart hook installed.
 
    Interactive - after a listing change, reinstall locally and confirm the cache version, then
    run the installed CLI from a terminal session and confirm the MCP tools appear (desktop
