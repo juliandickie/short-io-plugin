@@ -9,10 +9,20 @@
 4. Commit on main. Pushing, tagging (`vX.Y.Z`, annotated), and listing in the outfit and
    ai-loadout catalogues (both marketplace.json files and both README tables, same order)
    are separate actions each needing the maintainer's go.
-5. After a listing change, reinstall locally and confirm the cache version, then run the
-   installed CLI from a terminal session and confirm the MCP tools appear (desktop sessions
-   may not spawn plugin servers). The CLI is not on PATH, and the cache path rotates with
-   every version and session, so glob it at run time and never pin it.
+5. Prove the bridge answers a real tool call, both halves.
+
+   Automated - `node scripts/bridge-smoke.mjs` from the repo (it spawns the launcher, speaks
+   MCP over stdio and calls `get-domains`). Expect 14 tools and the account's hostnames, and
+   exit 0. It prints no ids and no key, so the output goes straight into the smoke record.
+
+   ```bash
+   SHORT_IO_PLUGIN_DATA=/tmp/sio-data node scripts/bridge-smoke.mjs
+   ```
+
+   Interactive - after a listing change, reinstall locally and confirm the cache version, then
+   run the installed CLI from a terminal session and confirm the MCP tools appear (desktop
+   sessions may not spawn plugin servers). The CLI is not on PATH, and the cache path rotates
+   with every version and session, so glob it at run time and never pin it.
 
    ```bash
    "$(ls -dt ~/.claude/plugins/cache/*/short-io/*/ | head -1)bin/short-io" whoami

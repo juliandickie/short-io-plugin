@@ -227,7 +227,7 @@ stripped from the child environment.
 |---|---|
 | `lib/` | The library modules - config, client, links, check, bulk, csv, cli |
 | `bin/short-io` | The CLI entry point |
-| `scripts/` | `run-mcp.mjs` (the bridge launcher) and `install-deps.sh` (the SessionStart hook) |
+| `scripts/` | `run-mcp.mjs` (the bridge launcher), `install-deps.sh` (the SessionStart hook) and `bridge-smoke.mjs` (a release check that drives the bridge over stdio and calls a tool) |
 | `hooks/hooks.json` | The SessionStart hook registration |
 | `skills/` | The seven skills |
 | `test/` | One test file per library module plus the launcher contract |

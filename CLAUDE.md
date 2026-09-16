@@ -14,8 +14,8 @@ are composed by capability reference in skill prose, never by importing their to
 ## Repo Layout Rules
 
 Seven directories at the plugin root - `lib/` (the modules - config, client, links, check,
-bulk, csv, cli), `bin/` (the `short-io` entry point), `scripts/` (`run-mcp.mjs` and
-`install-deps.sh`), `hooks/` (hooks.json), `skills/` (the seven skills), `test/` (one file per
+bulk, csv, cli), `bin/` (the `short-io` entry point), `scripts/` (`run-mcp.mjs`,
+`install-deps.sh` and `bridge-smoke.mjs`), `hooks/` (hooks.json), `skills/` (the seven skills), `test/` (one file per
 lib module plus the launcher contract), and `dev-docs/` (tracked, dated, additive logs - the
 API audit, smoke records, the release checklist). `.claude-plugin/` holds only `plugin.json`
 and `marketplace.json`, and `.mcp.json` sits at the root as the hosted MCP bridge
