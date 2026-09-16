@@ -1,6 +1,6 @@
 ---
 name: create-link
-description: Create one short link with duplicate checks - refuse a taken slug, report an existing link with the same destination, add title, tags and UTM fields, then verify the configured destination. Use when the user says shorten this, make a short link, give me a slug for, create idd-style vanity link, or add UTMs to a link.
+description: Create one short link with duplicate checks - refuse a taken slug, report an existing link with the same destination, add title, tags and UTM fields, then verify the configured destination. Use when the user says shorten this, make a short link, give me a slug for, create a vanity link, or add UTMs to a link.
 argument-hint: "<domain> <url> [--path slug] [--title t] [--tags a,b]"
 ---
 

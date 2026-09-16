@@ -53,8 +53,9 @@ ${CLAUDE_PLUGIN_ROOT}/bin/short-io bulk create links.csv --domain go.example.com
 ```
 
 Add `--allow-duplicate` only when the user approved the duplicate rows. Add `--out
-results.csv` to choose the results path; the default is the input filename with `-results.csv`
-appended. Creates are paced apart so the run stays under the link creation rate limit.
+results.csv` to choose the results path. The default strips the input file's `.csv` or `.json`
+extension and appends `-results.csv`, so `links.csv` writes `links-results.csv`. Creates are
+paced apart so the run stays under the link creation rate limit.
 
 ## 4 Report the counts
 
@@ -66,11 +67,14 @@ translating for the user.
 
 | Note | Meaning |
 |---|---|
-| `API returned the existing record` | The slug was already there with that destination |
-| `API returned an existing record for this destination` | The API deduped silently, nothing was created |
-| `slug held by a different destination` | The slug is taken, pick another |
-| `the API rejected this row as invalid` | Bad destination URL |
-| `duplicate of row N in this file` | The input file repeats itself |
+| `API returned the existing record` | The row was posted and the API answered with a link that was already there, nothing was created |
+| `API returned an existing record for this destination` | The API deduped silently on the destination, nothing was created |
+| `slug already points at this destination` | Skipped before posting, the slug was already correct |
+| `destination already shortened as <path>` | Skipped before posting, that destination already has a short link on the domain. Re-run with `--allow-duplicate` if a second one is really wanted |
+| `slug held by a different destination` | The slug is taken by something else, pick another |
+| `not an http(s) URL` | Skipped before posting, the `url` cell is not a valid destination |
+| `the API rejected this row as invalid` | The row was posted and the API rejected the destination |
+| `duplicate of row N in this file` | An earlier row in the same file already claimed that slug or destination |
 | Anything starting with an error code | The row failed, it is in the `failed` count |
 
 The command exits 1 if any row failed, 0 otherwise.

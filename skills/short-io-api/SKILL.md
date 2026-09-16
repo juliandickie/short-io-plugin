@@ -1,6 +1,6 @@
 ---
 name: short-io-api
-description: Reference for the Short.io REST endpoints the CLI uses, the hosted MCP server and its 11 tools with argument quirks, rate limits per endpoint family, error body shapes, the silent-dedupe behaviour of link creation, and the short-io CLI command table. Loaded when any skill or request needs an endpoint, a parameter, a tool name, or an exit code.
+description: Reference for the Short.io REST endpoints the CLI uses, the hosted MCP server and its 14 tools with argument quirks, rate limits per endpoint family, error body shapes, the silent-dedupe behaviour of link creation, and the short-io CLI command table. Loaded when any skill or request needs an endpoint, a parameter, a tool name, or an exit code.
 user-invocable: false
 ---
 
@@ -77,7 +77,8 @@ Three shapes appear and the client reads `message` first, then `error`.
 ## Hosted MCP server
 
 Endpoint `https://ai-assistant.short.io/mcp`, streamable HTTP, bare key in the header,
-30 requests per minute. Eleven tools.
+30 requests per minute. Fourteen tools, eleven purpose-built and three that reach the REST API
+directly.
 
 | Tool | What it does |
 |---|---|
@@ -92,9 +93,20 @@ Endpoint `https://ai-assistant.short.io/mcp`, streamable HTTP, bare key in the h
 | `top-column-statistics` | Top values of one column over a period. |
 | `top-by-interval-column` | A time series of one column over a period. |
 | `top-column-by-link-statistics` | Top values of one column for a single link. |
+| `list-api-endpoints` | Lists the REST endpoints the server can reach. Takes `service`, either `api` or `statistics`, and the optional `method`, `search` and `tag`. |
+| `describe-api-endpoint` | The parameter schema for one endpoint. Takes `service`, `method`, `path`. |
+| `call-api` | Executes any Short.io REST request as the user. Takes `service`, `method`, `path`, `query`, `body`. |
 
-There is no delete tool. Deletion goes through the CLI. The vendor's own MCP documentation
-claims both edit and delete are impossible; `edit-link` does in fact exist, delete does not.
+There is no dedicated delete tool, but `call-api` can delete, with `service` `api`, `method`
+`DELETE` and `path` `links/<idString>`. It can reach every other endpoint too, bulk endpoints
+included. The vendor's own MCP documentation claims both edit and delete are impossible; both
+are in fact reachable, `edit-link` directly and delete through `call-api`.
+
+A `call-api` write takes effect immediately and there is no dry run. Never repeat one after a
+timeout or an ambiguous answer; check the current state first with `expand` or the CLI.
+
+The CLI is still the better route for a delete inside a larger job, because it parses
+`domain/slug` for you, resolves the `idString` itself, and refuses to act without `--yes`.
 
 ### Argument quirks
 
@@ -105,6 +117,10 @@ An unknown property answers HTTP 500, so send only documented arguments.
   `utmContent`, `splitURL`, `splitPercent`, `androidURL`, `iphoneURL`, `expiresAt`,
   `clicksLimit`.
 - Every read and statistics tool takes the numeric `domainId`, not a hostname.
+- `call-api` takes the REST path without a leading slash, and `service` selects which API,
+  `api` for links and domains, `statistics` for the stats endpoints. Run
+  `list-api-endpoints` and then `describe-api-endpoint` before calling an endpoint you have
+  not used, rather than guessing a parameter name.
 - The search parameter on `search-links` is `q`, not `query`.
 - `get-link-list` returns at most 150 links per call, carries the true total in `count`, and
   pages with `beforeDate` set to the oldest `createdAt` of the previous page.

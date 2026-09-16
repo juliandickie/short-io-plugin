@@ -22,13 +22,18 @@ Never paste the key into chat. Put it straight into one of the places below.
 
 The resolver checks these in order and takes the first that answers.
 
-1. The plugin config field `short_io_api_key`, set through `/plugin manage`. Best for
-   interactive use, the value is stored as a sensitive field.
-2. The `SHORT_IO_API_KEY` environment variable. Best for CI and one-off shells.
-3. The config file `~/.config/short-io-plugin/config.toml`, mode 0600. Best for unattended
+1. The environment, `SHORT_IO_API_KEY` first and then the plugin config field
+   `short_io_api_key` set through `/plugin manage`, which arrives as an environment variable
+   of its own. The env var wins if both are set. Use the plugin field for interactive work,
+   where it is stored as a sensitive value, and the env var for CI and one-off shells.
+2. The config file `~/.config/short-io-plugin/config.toml`, mode 0600. Best for unattended
    runs, because nothing has to be exported first.
-4. A 1Password secret reference, read through the `op` CLI at start. Best when the key must
+3. A 1Password secret reference, read through the `op` CLI at start. Best when the key must
    never sit on disk in plain text.
+
+`whoami` prints the source as `env`, `file` or `op`. Because the plugin config field is
+supplied through the environment, both it and `SHORT_IO_API_KEY` report as `env`, so that
+word does not tell you which of the two answered. If it matters, unset one and re-run.
 
 The config file, for either the direct key or the 1Password pointer.
 
@@ -76,7 +81,7 @@ Restart Claude Code so the hook runs and the server starts with the key in place
 ${CLAUDE_PLUGIN_ROOT}/bin/short-io whoami
 ```
 
-It prints the key source, then a row per domain with the numeric id, the hostname, the link
+It prints the key source (`env`, `file` or `op`), then a row per domain with the numeric id, the hostname, the link
 type and the link count. Then confirm the hosted tools are live by calling `get-domains` and
 checking that the same domains come back. Both surfaces answering means the one key is
 working on both.

@@ -13,8 +13,16 @@ whichever surface the job needs.
 ## Two ways in
 
 The hosted MCP tools are the first choice for conversational, single-link work and for every
-statistic. They create a link, edit one, search for one, list domains, and answer every click
-question. They run over `https://ai-assistant.short.io/mcp`, 30 requests per minute.
+statistic. Fourteen tools create a link, edit one, search for one, list domains, and answer
+every click question, and the last three (`list-api-endpoints`, `describe-api-endpoint`,
+`call-api`) reach any Short.io REST endpoint at all, DELETE and bulk endpoints included. They
+run over `https://ai-assistant.short.io/mcp`, 30 requests per minute.
+
+So the MCP surface can do anything the REST API can. What the CLI adds is the judgement around
+it, duplicate detection before a create, enumeration paged to the true end of a domain,
+destination truth checks against `expand`, and unattended or scripted runs that write a file.
+A `call-api` write takes effect immediately, so never repeat one after a timeout without
+checking first whether it already landed.
 
 The CLI is the gap filler. Use it whenever the job needs every link on a domain, the truth about
 what a slug really points at, a file on disk, duplicate detection before creating, or a delete.
@@ -30,7 +38,7 @@ It talks to the REST API directly and is invoked as
 | Every link on a domain, with the true total | CLI `links` |
 | What does this slug actually point at | CLI `check` |
 | Many links from a CSV or JSON file | CLI `bulk create` |
-| Delete a link | CLI `delete` (the MCP server has no delete tool) |
+| Delete a link | CLI `delete`, or MCP `call-api` with method DELETE |
 | Clicks, countries, referrers, campaigns | MCP statistics tools |
 
 ## Which skill
