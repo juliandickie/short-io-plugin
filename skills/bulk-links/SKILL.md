@@ -62,8 +62,10 @@ paced apart so the run stays under the link creation rate limit.
 The run prints `created`, `skipped` and `failed`, then the results file path. The results CSV
 has the columns `row,url,path,action,short_url,id,note`.
 
-Read that file and report the three counts, then every failed row with its note. Notes worth
-translating for the user.
+Read that file and report the three counts, then every failed row with its note. The `row`
+number is the physical line in the CSV (the header counts as line 1, so the first data row is
+line 2) or, for JSON input, the 1-based position in the array. Notes worth translating for the
+user.
 
 | Note | Meaning |
 |---|---|
@@ -73,7 +75,6 @@ translating for the user.
 | `destination already shortened as <path>` | Skipped before posting, that destination already has a short link on the domain. Re-run with `--allow-duplicate` if a second one is really wanted |
 | `slug held by a different destination` | The slug is taken by something else, pick another |
 | `not an http(s) URL` | Skipped before posting, the `url` cell is not a valid destination |
-| `the API rejected this row as invalid` | The row was posted and the API rejected the destination |
 | `duplicate of row N in this file` | An earlier row in the same file already claimed that slug or destination |
 | Anything starting with an error code | The row failed, it is in the `failed` count |
 

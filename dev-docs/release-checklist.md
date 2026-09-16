@@ -15,7 +15,7 @@
    every version and session, so glob it at run time and never pin it.
 
    ```bash
-   "$(ls -d ~/.claude/plugins/cache/*/short-io/*/ | tail -1)bin/short-io" whoami
+   "$(ls -dt ~/.claude/plugins/cache/*/short-io/*/ | head -1)bin/short-io" whoami
    ```
 
    Inside a Claude Code session the same command is

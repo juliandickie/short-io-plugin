@@ -123,6 +123,14 @@ test('listAllLinks refuses to loop on a repeated page token', async () => {
   assert.equal(calls, 2);
 });
 
+test('listAllLinks refuses to loop on an alternating A, B, A page token cycle', async () => {
+  const tokens = ['page_a', 'page_b', 'page_a'];
+  let calls = 0;
+  const c = fake({ listLinks: async () => { const t = tokens[calls]; calls += 1; return { count: 9, links: [{ path: 'a' }], nextPageToken: t }; } });
+  await assert.rejects(listAllLinks(c, 12345), (e) => e instanceof ShortIoError && e.code === 'unknown' && /page_a/.test(e.message));
+  assert.equal(calls, 3);
+});
+
 test('resolveDomain fails loud when listDomains is not an array', async () => {
   const c = fake({ listDomains: async () => ({ domains: [] }) });
   await assert.rejects(resolveDomain(c, 'go.example.com'), (e) => e instanceof ShortIoError && e.code === 'unknown' && /array/.test(e.message));

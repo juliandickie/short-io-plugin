@@ -36,7 +36,10 @@ test('whoami reports the key source and the domains with counts, never the key',
   const h = ctx(); assert.equal(await run(['whoami', '--json'], h.c), 0);
   const j = JSON.parse(h.out.join(''));
   assert.equal(j.key_source, 'file'); assert.equal(j.domains[0].hostname, 'go.example.com'); assert.equal(j.domains[0].links, 2);
+  assert.equal(typeof j.config_path, 'string'); assert.match(j.config_path, /short-io-plugin\/config\.toml$/);
   assert.equal(h.out.join('').includes('sk_T'), false);
+  const t = ctx(); assert.equal(await run(['whoami'], t.c), 0);
+  assert.match(t.out.join(''), /config path: .*short-io-plugin\/config\.toml/);
 });
 
 test('no key exits 2 with the setup hint', async () => {

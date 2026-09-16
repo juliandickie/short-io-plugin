@@ -30,10 +30,10 @@ There is no build step, the plugin runs directly from source under Node >=22 in 
 zero runtime dependencies beyond the pinned `mcp-remote` the SessionStart hook installs.
 `npm test` runs `node --test test/*.test.js` for the unit and integration tests, and
 `claude plugin validate .` validates the plugin and marketplace manifests, and nothing beyond
-them, so `npm test` is the gate for behavior. Every module
+them, so `npm test` is the gate for behaviour. Every module
 in `lib/` takes its side effects (fs, exec, fetch, clock) as injectable parameters and is unit
 tested without network access. Both gates are expected to pass before any commit that touches
-plugin behavior.
+plugin behaviour.
 
 ## Known API Limits (proven live, dev-docs/api-audit-2026-09-16.md)
 
@@ -46,6 +46,23 @@ one and only `GET /links/expand` tells the truth about a slug. Rate limits are p
 family read from `x-ratelimit-limit`, 1000 for listing, 50 for link creation, 20 for link info
 and delete, and the hosted MCP endpoint's 30 per minute is a separate budget. The key goes in
 the `authorization` header bare; a `Bearer ` prefix answers the same 401 as no header at all.
+
+## Design Notes (deliberate divergences from the spec)
+
+`checkSlug` has six verdicts, `ok`, `free`, `free-but-redirects`, `free-but-served`,
+`mismatch` and `not-resolving`, and the fallback probe reports a `kind` of `notfound`,
+`redirect`, `page`, `other` or `error`. A 2xx page for an unknown slug is a fallback exactly
+as a 3xx is, so both set `hasFallback`.
+
+`check` reports the FIRST live hop rather than following the chain to its end. The probe has
+to use manual redirects to read the domain's 404 behaviour at all, and the configured record
+from `expand` is the truth about a slug anyway, so a full chase would cost extra requests to
+produce a weaker answer.
+
+The key resolver reads the environment variable BEFORE the plugin config field, even though
+the config field reads as the more specific setting. `.mcp.json` maps the field onto the same
+env var, so by the time the bridge runs the two are indistinguishable, and a rule that claimed
+to prefer one over the other would be describing something the process cannot see.
 
 ## Versioning
 

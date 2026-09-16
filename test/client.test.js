@@ -94,6 +94,13 @@ test('rateInfo and classify helpers', () => {
   assert.equal(classify({ status: 200, body: { ok: 1 }, endpoint: 'x' }).ok, 1);
 });
 
+test('a 429 with a huge reset window is capped at the maximum pace', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(429, {}, { 'x-ratelimit-reset': '900' }), res(200, [])], { backoffMs: [100, 200, 300] });
+  assert.deepEqual(await c.listDomains(), []);
+  assert.deepEqual(calls.sleeps, [MAX_PACE_MS]);
+});
+
 test('a 429 carrying remaining 0 sleeps exactly once', async () => {
   const calls = []; calls.sleeps = [];
   const c = client(calls, [res(429, {}, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '2' }), res(200, [])], { backoffMs: [100, 200, 300] });
