@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTarget, resolveDomain, listAllLinks, classifyCreate, createOne, deleteBySlug, normaliseTags } from '../lib/links.mjs';
+import { parseTarget, resolveDomain, listAllLinks, classifyCreate, createOne, deleteBySlug, normaliseTags, STALE_MS } from '../lib/links.mjs';
 import { ShortIoError } from '../lib/client.mjs';
 
 const DOMAINS = [{ id: 12345, hostname: 'go.example.com', linkType: 'eight-char', redirect404: null }];
@@ -85,4 +85,45 @@ test('normaliseTags splits on commas, trims and drops empties', () => {
   assert.deepEqual(normaliseTags(' a, b ,,c '), ['a', 'b', 'c']);
   assert.deepEqual(normaliseTags(['x']), ['x']);
   assert.deepEqual(normaliseTags(''), []);
+});
+
+test('classifyCreate compares URLs normalised, not as raw strings', async () => {
+  const same = fake({ expand: async () => ({ idString: 'link_s', originalURL: 'https://example.com/' }) });
+  for (const url of ['https://example.com', 'HTTPS://EXAMPLE.com']) {
+    const v = await classifyCreate(same, { domain: 'go.example.com', originalURL: url, path: 'p' });
+    assert.equal(v.action, 'exists', `expected exists for ${url}`);
+    assert.deepEqual(v.known, ['link_s']);
+  }
+  const other = await classifyCreate(same, { domain: 'go.example.com', originalURL: 'https://example.com/other', path: 'p' });
+  assert.equal(other.action, 'taken');
+});
+
+test('createOne reports exists by identity even when the timestamp looks fresh', async () => {
+  const dup = fake({
+    linksByUrl: async () => [{ idString: 'link_d', path: 'other' }],
+    createLink: async () => ({ idString: 'link_d', path: 'other', createdAt: new Date().toISOString() }),
+  });
+  const out = await createOne(dup, { domain: 'go.example.com', originalURL: 'https://example.com/' }, { allowDuplicate: true });
+  assert.equal(out.action, 'exists');
+  assert.equal(out.link.idString, 'link_d');
+});
+
+test('createOne treats an unknown id created just before the call as created', async () => {
+  const now = () => new Date('2026-09-16T00:00:00Z');
+  const c = fake({ createLink: async () => ({ idString: 'link_fresh', createdAt: '2026-09-15T23:59:30.000Z' }) });
+  const out = await createOne(c, { domain: 'go.example.com', originalURL: 'https://example.com/' }, { now });
+  assert.equal(out.action, 'created');
+  assert.equal(STALE_MS, 60000);
+});
+
+test('listAllLinks refuses to loop on a repeated page token', async () => {
+  let calls = 0;
+  const c = fake({ listLinks: async () => { calls += 1; return { count: 9, links: [{ path: 'a' }], nextPageToken: 'page_2' }; } });
+  await assert.rejects(listAllLinks(c, 12345), (e) => e instanceof ShortIoError && e.code === 'unknown' && /page_2/.test(e.message));
+  assert.equal(calls, 2);
+});
+
+test('resolveDomain fails loud when listDomains is not an array', async () => {
+  const c = fake({ listDomains: async () => ({ domains: [] }) });
+  await assert.rejects(resolveDomain(c, 'go.example.com'), (e) => e instanceof ShortIoError && e.code === 'unknown' && /array/.test(e.message));
 });
