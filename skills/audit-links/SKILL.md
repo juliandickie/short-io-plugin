@@ -77,8 +77,8 @@ matters, the ones that look wrong or that the user named.
 
 ## 3 Reconcile a list of destinations
 
-Read the user's list of destination URLs. Match each one against the `originalURL` column of
-`links.csv`, first exactly, then again with a trailing slash removed and the query string
+Read the user's list of destination URLs. Match each one against the `originalURL` field of
+`links.json`, first exactly, then again with a trailing slash removed and the query string
 stripped, and report the looser match as a near match rather than an exact one.
 
 Report two lists, found (destination, slug, short URL) and missing (destination only), with
