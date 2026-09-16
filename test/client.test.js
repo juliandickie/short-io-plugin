@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ShortIoClient, ShortIoError, classify, rateInfo } from '../lib/client.mjs';
+import { ShortIoClient, ShortIoError, classify, rateInfo, MAX_PACE_MS } from '../lib/client.mjs';
 
 const res = (status, body, headers = {}) => ({
   status, headers: { get: (k) => headers[k.toLowerCase()] ?? null }, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
@@ -92,4 +92,72 @@ test('rateInfo and classify helpers', () => {
   assert.deepEqual(rateInfo({ get: (k) => ({ 'x-ratelimit-limit': '50', 'x-ratelimit-remaining': '3', 'x-ratelimit-reset': '1' })[k] }), { limit: 50, remaining: 3, reset: 1 });
   assert.throws(() => classify({ status: 500, body: { message: 'boom' }, endpoint: 'x' }), (e) => e.code === 'transient');
   assert.equal(classify({ status: 200, body: { ok: 1 }, endpoint: 'x' }).ok, 1);
+});
+
+test('a 429 carrying remaining 0 sleeps exactly once', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(429, {}, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '2' }), res(200, [])], { backoffMs: [100, 200, 300] });
+  assert.deepEqual(await c.listDomains(), []);
+  assert.deepEqual(calls.sleeps, [2000]);
+});
+
+test('a drained create bucket does not pace a listing call, and its own pace is capped', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [
+    res(200, { idString: 'link_1' }, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '900' }),
+    res(200, []),
+    res(200, { idString: 'link_2' }),
+  ]);
+  await c.createLink({ domain: 'go.example.com', originalURL: 'https://example.com/' });
+  await c.listDomains();
+  assert.deepEqual(calls.sleeps, []);
+  await c.createLink({ domain: 'go.example.com', originalURL: 'https://example.com/2' });
+  assert.deepEqual(calls.sleeps, [MAX_PACE_MS]);
+  assert.equal(MAX_PACE_MS, 60000);
+});
+
+test('the pre-request pace is per family and clears after use', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [
+    res(200, { idString: 'link_1' }, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1' }),
+    res(200, { idString: 'link_1' }),
+    res(200, { idString: 'link_1' }),
+  ]);
+  await c.expand('go.example.com', 'slug');
+  await c.getLink('link_1');
+  assert.deepEqual(calls.sleeps, [1000]);
+  await c.getLink('link_1');
+  assert.deepEqual(calls.sleeps, [1000]);
+});
+
+test('a timeout maps to code timeout, with no retry and no sleep', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = new ShortIoClient({
+    key: 'sk_T', backoffMs: [1, 2, 3],
+    sleep: async (ms) => { calls.sleeps.push(ms); },
+    fetch: async (url, init) => { calls.push({ url, init }); const e = new Error('timed out'); e.name = 'TimeoutError'; throw e; },
+  });
+  await assert.rejects(c.listDomains(), (e) => e.code === 'timeout' && /did not answer/.test(e.message));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls.sleeps, []);
+});
+
+test('a non-JSON 200 body maps to unknown', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(200, '<html>maintenance</html>')]);
+  await assert.rejects(c.listDomains(), (e) => e.code === 'unknown' && /Non-JSON response/.test(e.message));
+});
+
+test('linksByUrl unwraps both the wrapped and the bare array shape', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(200, { links: [{ idString: 'link_1' }] }), res(200, [{ idString: 'link_2' }]), res(200, {})]);
+  assert.deepEqual(await c.linksByUrl('go.example.com', 'https://example.com/'), [{ idString: 'link_1' }]);
+  assert.deepEqual(await c.linksByUrl('go.example.com', 'https://example.com/'), [{ idString: 'link_2' }]);
+  assert.deepEqual(await c.linksByUrl('go.example.com', 'https://example.com/'), []);
+});
+
+test('a 403 is auth', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(403, { error: 'Forbidden' })]);
+  await assert.rejects(c.listDomains(), (e) => e.code === 'auth');
 });
