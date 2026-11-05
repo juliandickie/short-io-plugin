@@ -78,6 +78,10 @@ stderr line both name the account. The CLI routes by domain, and any error while
 the command instead of moving on, because moving on could create a link in the wrong account.
 There is no domain cache, so each routed command spends one listing call per account tried.
 
+A section header other than `[accounts.<name>]` is an error beside named accounts, not a
+warning, because a mistyped header drops that account's key and folders and sends its sessions
+to the default. Bridge stderr is not shown to the user, so a warning there would not be seen.
+
 `parseToml` scopes keys to their section. It used to merge every section into the top level,
 which let the last `api_key` in a file silently win, and 0.1.0 still reads a file that way. So
 on a machine moving from 0.1.0, keep the account the old CLI should read as the last section

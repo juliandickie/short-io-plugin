@@ -14,11 +14,13 @@ account, and their JSON is additive.
 Errors, each naming the fix - a key in the settings field or environment beside named accounts,
 a top-level key beside sections, a `default` that names nothing, a section with no key, a folder
 under two accounts, a repeated section or key, an unreadable `folders` value, a folder that is
-not a full path, and (bridge only) no default with no matching folder.
+not a full path, any section header other than `[accounts.<name>]` beside named accounts or
+one that looks like an account in a one-key file, and (bridge only) no default with no matching
+folder.
 
 Fixed - the config parser merged every `[section]` into the top level, so the last `api_key` in
-a file silently won. Keys now belong to their section, and any section other than
-`[accounts.<name>]` is skipped with a warning.
+a file silently won. Keys now belong to their section. In a one-key file, any other section is
+skipped with a warning.
 
 Changed - if you had keys under another `[section]` of the config file, they are now ignored.
 Move them to the top level or into an account.

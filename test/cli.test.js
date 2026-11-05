@@ -485,3 +485,10 @@ test('single-key domains keeps its table and adds account to the JSON', async ()
   assert.equal(await run(['domains', '--json'], j.c), 0);
   assert.deepEqual(JSON.parse(j.out.join('')), [{ ...DOMAINS[0], account: 'default' }]);
 });
+
+test('a mistyped account header stops the CLI before any key is read', async () => {
+  const h = accounts({ config: `${TWO}\n[acount.third]\napi_key = "sk_THIRD"` });
+  assert.equal(await run(['domains'], h.c), 2);
+  assert.match(h.err.join(''), /line 9/);
+  assert.deepEqual(h.opened, []);
+});

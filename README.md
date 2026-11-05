@@ -142,10 +142,13 @@ These are errors too, each with the fix in the message.
 - The same folder listed by two accounts, compared after resolving symlinks.
 - A repeated section, or a key set twice in one section.
 - A `folders` value that cannot be read, or an entry that is not a full path or `~/` path.
+- Any section header other than `[accounts.<name>]` beside named accounts, because a mistyped
+  header would drop that account and send its folders to the default.
 - More than one account, no `default`, and a folder no account lists (the bridge only).
 
-Any other `[section]` is skipped with a warning, and its keys are ignored. A listed folder that
-does not exist gets a warning, so a typo cannot quietly send a session to the default.
+In a one-key file, a section header that looks like an account (`[account.x]`) is an error too.
+Any other `[section]` there is skipped with a warning, and its keys are ignored. A listed folder
+that does not exist gets a warning, so a typo cannot quietly send a session to the default.
 
 To move from one key to two, put `[accounts.<name>]` above your existing `api_key` line, add
 the second section and any `folders`, add `default = "<name>"` as the first line, clear the

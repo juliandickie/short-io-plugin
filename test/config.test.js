@@ -33,7 +33,7 @@ test('configPath honours XDG_CONFIG_HOME', () => {
 });
 
 test('readConfigFile returns exists=false on ENOENT and warns on loose permissions', async () => {
-  assert.deepEqual(await readConfigFile({ env: {}, homedir: home, ...fileAt({}) }), { path: CFG, values: {}, sections: [], exists: false });
+  assert.deepEqual(await readConfigFile({ env: {}, homedir: home, ...fileAt({}) }), { path: CFG, values: {}, sections: [], ignored: [], exists: false });
   const warnings = [];
   const loose = await readConfigFile({ env: {}, homedir: home, ...fileAt({ [CFG]: 'api_key = "sk_k"' }, 0o644), warn: (m) => warnings.push(m) });
   assert.equal(loose.values.api_key, 'sk_k');
@@ -141,7 +141,7 @@ test('parseToml skips any other section and keeps its keys out', () => {
     const { values, sections, ignored, skipped } = parseToml(`default = "z"\n${header}\napi_key = "sk_stray"\nfolders = ["x"]`);
     assert.deepEqual(values, { default: 'z' }, header);
     assert.deepEqual(sections, [], header);
-    assert.deepEqual(ignored, [2], header);
+    assert.deepEqual(ignored, [{ line: 2, accountLike: header !== '[other]' }], header);
     assert.deepEqual(skipped, [], header);
   }
 });
@@ -415,4 +415,34 @@ test('a key pasted into the wrong place does not come back out in an error', asy
 
 test('a deleted working folder with named accounts says what to do', async () => {
   await assert.rejects(load(TWO, { cwd: () => { throw new Error('ENOENT: uv_cwd'); } }), (e) => e instanceof ConfigError && /working folder/.test(e.message) && /Run this from a folder that exists/.test(e.message));
+});
+
+test('beside named accounts, any other header stops by its line number, so an account cannot vanish', async () => {
+  const good = 'default = "pm"\n[accounts.pm]\napi_key = "sk_PM"\n';
+  for (const header of ['[account.idd]', '[ accounts.idd ]', '[accounts."idd"]', '[acounts.idd]', '[accounts.idd.x]', '[[accounts.idd]]', '[general]']) {
+    await refuses(`${good}${header}\napi_key = "sk_IDD"\nfolders = ["/srv/idd"]\n`, /line 4.*\[accounts\.<name>\]/s);
+  }
+});
+
+test('the reproduction - a session in the folder of a mistyped account gets no key at all', async () => {
+  const deps = { env: {}, homedir: home, ...fileAt({ [CFG]: 'default = "pm"\n[accounts.pm]\napi_key = "sk_PM"\n[account.idd]\napi_key = "sk_IDD"\nfolders = ["/srv/idd"]' }), realpath: async (p) => p, cwd: () => '/srv/idd/x' };
+  await assert.rejects(resolveBridgeKey(deps), (e) => e instanceof ConfigError && /line 4/.test(e.message));
+});
+
+test('in a one-key file only a header that looks like an account stops', async () => {
+  await refuses('[account.idd]\napi_key = "sk_a"', /line 1.*\[accounts\.<name>\]/s);
+  await refuses('api_key = "sk_a"\n[Accounts.idd]', /line 2/);
+  const warnings = [];
+  const m = await load('api_key = "sk_a"\n[general]\nfoo = "bar"', { warn: (w) => warnings.push(w) });
+  assert.equal(m.named, false);
+  assert.match(warnings.join('\n'), /line 2/);
+  assert.equal(m.file.values.api_key, 'sk_a');
+});
+
+test('a mistyped account header stops even with a key in the settings field', async () => {
+  await assert.rejects(resolveBridgeKey({ env: { SHORT_IO_API_KEY: 'sk_FIELD' }, homedir: home, ...fileAt({ [CFG]: '[account.idd]\napi_key = "sk_a"\nfolders = ["/srv/idd"]' }), realpath: async (p) => p, cwd: () => '/srv/idd' }), (e) => e instanceof ConfigError && /line 1/.test(e.message));
+});
+
+test('the header error never repeats the header, which could hold a pasted key', async () => {
+  await assert.rejects(load('[accounts.pm]\napi_key = "sk_PM"\n[sk_SEEN]'), (e) => /line 3/.test(e.message) && !e.message.includes('sk_SEEN'));
 });

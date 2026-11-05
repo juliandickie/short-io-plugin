@@ -148,6 +148,7 @@ of that one account.
 | `No account owns domain` | No configured key can see that domain. The message lists each account and its domains. |
 | `No domain X on this account` with `--account` | The named account does not own that domain. Drop `--account` to let the CLI find the owner. |
 | `folders must be a string or a one-line array` | A `folders` value could not be read, often an array split over several lines. Put it on one line. |
+| `this section header is not [accounts.<name>]` | A header on that line is mistyped, or is not an account section. Fix it or remove it, because a mistyped header would drop that account. |
 
 Exit code 2 from the CLI is a configuration or usage problem, exit code 1 is an API or
 network error.
