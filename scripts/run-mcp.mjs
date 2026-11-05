@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Launcher for the Short.io MCP bridge. Resolves the API key through the shared chain,
+// Launcher for the Short.io MCP bridge. Resolves the API key for this session's folder,
+// through named accounts when the config file has them and the shared chain when it does not,
 // writes it to a 0600 header file in the plugin data dir, and execs mcp-remote against
 // https://ai-assistant.short.io/mcp. The key never appears in argv. Short.io has no OAuth,
 // so with no key configured there is nothing to start and the launcher exits 2.
@@ -14,7 +15,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveKey, dataDir, ConfigError, SECRET_ENV } from '../lib/config.mjs';
+import { resolveBridgeKey, dataDir, ConfigError, SECRET_ENV } from '../lib/config.mjs';
 
 export const MCP_URL = 'https://ai-assistant.short.io/mcp';
 export const HEADER_FILE_PREFIX = 'mcp-remote';
@@ -40,7 +41,7 @@ export function childEnv(env) {
 }
 
 export async function main({
-  env = process.env, resolve = resolveKey, write = writeFile, mkdirp = mkdir, chmodImpl = chmod, rmImpl = rm, exists = existsSync,
+  env = process.env, resolve = resolveBridgeKey, write = writeFile, mkdirp = mkdir, chmodImpl = chmod, rmImpl = rm, exists = existsSync,
   spawnImpl = spawn, stderr = process.stderr, execPath = process.execPath, pid = process.pid,
   onSignal = (handler) => { for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => handler(sig)); },
 } = {}) {
@@ -52,8 +53,10 @@ export async function main({
   }
   let key = null;
   let configPath;
+  let account;
+  let rule;
   try {
-    ({ key, configPath } = await resolve({ env, warn: (m) => stderr.write(`short-io: ${m}\n`) }));
+    ({ key, configPath, account, rule } = await resolve({ env, warn: (m) => stderr.write(`short-io: ${m}\n`) }));
   } catch (error) {
     if (error instanceof ConfigError || error?.code === 'config') { stderr.write(`short-io: ${error.message}\n`); return 2; }
     throw error;
@@ -78,6 +81,8 @@ export async function main({
     stderr.write(`short-io: no API key configured (checked env, plugin config, ${configPath ?? 'the config file'}, 1Password). Run /short-io:setup, or put api_key = "sk_..." in the config file. Short.io has no OAuth, so the bridge cannot start without a key.\n`);
     return 2;
   }
+  // Which account a session writes to is the one thing a user cannot see from the tools alone.
+  if (account) stderr.write(`short-io: account ${account} - ${rule}\n`);
   const child = spawnImpl(execPath, buildArgv({ proxy, headerFile }), { stdio: 'inherit', env: childEnv(env) });
   onSignal((sig) => { try { child.kill(sig); } catch { /* already gone */ } });
   let cleaned = false;
