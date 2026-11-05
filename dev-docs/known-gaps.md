@@ -14,7 +14,7 @@ missing, then continue, instead of exiting.
 
 ## 2026-11-05 - hosted MCP session lost, the app keeps reporting the bridge as connected
 
-Seen in a Pro Marketing session (clients/ascot-re). Every hosted MCP call returned `Bad
+Seen in one client session. Every hosted MCP call returned `Bad
 Request: No valid session ID provided` from mcp-remote, while the REST CLI worked with the
 same machine and network. The app did not re-dial the server, because it still reported it as
 connected. A fresh session's bridge answered `get-domains` normally the same day. Workaround -
@@ -31,3 +31,21 @@ warning. Proved on the maintainer's machine - `get-domains` answered one account
 `short-io whoami` the other's. The fix is the multi-account design (named accounts in
 `config.toml`, the bridge picking its account by session folder, and an error when the settings
 field is also set), planned for 0.2.0.
+
+## 2026-11-05 - fixed in 0.2.0 - the settings field and the config file
+
+Named accounts close the split in the entry above. Each account has its own key in
+`config.toml`, and any Short.io setting in the environment beside them is an error.
+
+A single-key setup can still split the same way, because its chain did not change. With one key
+in the settings field and a different top-level `api_key` in the file, the MCP tools and the CLI
+still use different accounts. The fix for that user is named accounts, or one key in one place.
+
+## 2026-11-05 - fixed in 0.2.0 - create failed on any new destination
+
+`create` and `bulk create` stopped with `links/multiple-by-url: No links found` whenever the
+destination had no link on that domain yet. The by-URL lookup answers 404 in that case, and the
+client treated it as an error. The 0.1.0 audit recorded only the case with a match, and its write
+smoke used a destination that already had links, so neither saw it. The 0.2.0 dry run found it
+on both accounts. Only the exact message counts as "no links", so a reworded message fails loud
+and cannot create a duplicate link.

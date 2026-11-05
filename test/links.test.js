@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTarget, resolveDomain, listAllLinks, classifyCreate, createOne, deleteBySlug, normaliseTags, sameUrl, STALE_MS } from '../lib/links.mjs';
+import { parseTarget, resolveDomain, matchDomain, listAllLinks, classifyCreate, createOne, deleteBySlug, normaliseTags, sameUrl, STALE_MS } from '../lib/links.mjs';
 import { ShortIoError } from '../lib/client.mjs';
 
 const DOMAINS = [{ id: 12345, hostname: 'go.example.com', linkType: 'eight-char', redirect404: null }];
@@ -157,4 +157,15 @@ test('a supplied duplicate verdict short-circuits without a POST', async () => {
   const out = await createOne(c, { domain: 'go.example.com', originalURL: 'https://example.com/a' }, { verdict: { action: 'duplicate', known: ['link_d'] } });
   assert.equal(out.action, 'duplicate');
   assert.equal(posted, 0);
+});
+
+test('matchDomain finds a domain by hostname or id, or answers null', () => {
+  const domains = [{ id: 7, hostname: 'Go.Example.com', linkType: 'random', redirect404: 'https://x' }, { id: 8, hostname: 'other.example', linkType: 'random' }];
+  assert.equal(matchDomain(domains, 'go.example.com').id, 7);
+  assert.equal(matchDomain(domains, ' GO.EXAMPLE.COM ').id, 7);
+  assert.equal(matchDomain(domains, 8).hostname, 'other.example');
+  assert.deepEqual(matchDomain(domains, '7'), { id: 7, hostname: 'Go.Example.com', linkType: 'random', redirect404: 'https://x' });
+  assert.equal(matchDomain(domains, '8').redirect404, null);
+  assert.equal(matchDomain(domains, 'nope.example'), null);
+  assert.throws(() => matchDomain({}, 'x'), /did not return an array/);
 });

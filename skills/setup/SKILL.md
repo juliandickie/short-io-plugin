@@ -1,6 +1,6 @@
 ---
 name: setup
-description: First-run setup for the Short.io plugin - create a SECRET API key, choose how it is supplied (SHORT_IO_API_KEY or the plugin config field, the 0600 config file for unattended use, or a 1Password reference), remove a stale user-scope MCP entry so tools do not double up, then verify with the plugin's short-io whoami.
+description: First-run setup for the Short.io plugin - create a SECRET API key, choose how it is supplied (SHORT_IO_API_KEY or the plugin config field, the 0600 config file for unattended use, or a 1Password reference), add a second account with its own key and folders, remove a stale user-scope MCP entry so tools do not double up, then verify with the plugin's short-io whoami.
 disable-model-invocation: true
 argument-hint: ""
 ---
@@ -55,7 +55,52 @@ Create it with the right permissions before writing anything into it.
 mkdir -p ~/.config/short-io-plugin && touch ~/.config/short-io-plugin/config.toml && chmod 600 ~/.config/short-io-plugin/config.toml
 ```
 
-## 3 Remove a stale MCP entry
+## 3 Add a second account
+
+Skip this step if you have one key. A one-key setup keeps working with no change.
+
+Give each account its own section in the config file. `default` names the account for any
+folder that no account lists.
+
+```toml
+default = "agency"
+
+[accounts.agency]
+api_key = "sk_..."
+
+[accounts.clinic]
+api_key = "sk_..."
+folders = ["~/code/clinic-site", "~/code/clinic-shop"]
+```
+
+A section takes `api_key`, or `op_ref` with an optional `op_account`, plus an optional
+`folders`. `folders` is one string or a one-line array of double-quoted strings, each a full
+path or starting with `~/`. An account name uses letters, digits, `_` and `-`. With one
+account, `default` may be left out.
+
+Each surface picks its account in its own way.
+
+1. The MCP tools use the account for the session's folder. An account matches when one of its
+   folders is the session's folder or a parent of it, and the longest match wins. No match
+   means `default`. So the tools serve one account per session.
+2. The CLI uses the account that owns the domain you give it, whichever folder you are in.
+   It tries the folder's account, then `default`, then the rest of the file in order.
+3. `--account <name>` makes any CLI command use that account only.
+
+To move from one key to two, follow these steps.
+
+1. Open `~/.config/short-io-plugin/config.toml`.
+2. Add a line `[accounts.<name>]` directly above the existing `api_key` line.
+3. Add a second `[accounts.<name>]` section below it, with the second `api_key`.
+4. Add a `folders` line to each account that owns a folder.
+5. Add `default = "<name>"` as the first line of the file, above every section.
+6. Clear all three Short.io fields in `/plugin manage`, and unset `SHORT_IO_API_KEY` in your
+   shell. **Warning** - the CLI stops and the MCP bridge refuses to start while any of them is
+   set beside named accounts, because two keys could silently compete.
+7. Restart the session.
+8. Run the `whoami` command in the Verify step, and read which account each domain is under.
+
+## 4 Remove a stale MCP entry
 
 If a `short-io` MCP server was added by hand in an earlier session, the plugin's own server
 and that one both register and the tools double up. Remove the hand-added entry.
@@ -70,12 +115,12 @@ If the same name is also registered at project scope, remove that too.
 claude mcp remove short-io -s project
 ```
 
-## 4 Restart the session
+## 5 Restart the session
 
 The plugin's SessionStart hook installs `mcp-remote`, which the hosted MCP bridge needs.
 Restart Claude Code so the hook runs and the server starts with the key in place.
 
-## 5 Verify
+## 6 Verify
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/bin/short-io whoami
@@ -86,7 +131,11 @@ type and the link count. Then confirm the hosted tools are live by calling `get-
 checking that the same domains come back. Both surfaces answering means the one key is
 working on both.
 
-## 6 Troubleshooting
+With two or more accounts, `whoami` prints that block for every account, then the default
+account and the account this folder's MCP tools use. `get-domains` should answer the domains
+of that one account.
+
+## 7 Troubleshooting
 
 | Message | What it actually means |
 |---|---|
@@ -94,6 +143,12 @@ working on both.
 | `mcp-remote is not installed` | The SessionStart hook has not run or failed. Run `scripts/install-deps.sh` from the plugin directory, then restart. |
 | A message about a `pk_` key | A public key was supplied. Create a secret key with the "Public key" toggle OFF. |
 | `no API key configured` | None of the four sources answered. Re-check step 2, then re-run `whoami`. |
+| `... is set ... while ... has [accounts.*] sections` | A key is in the plugin settings field or the environment beside named accounts. Move it into an `[accounts.<name>]` section and clear the field. The message names the variable, never its value. |
+| `No account for <folder>` | There is more than one account, no `default`, and no account lists this folder, so the bridge will not start here. Add `default`, or add the folder to an account. |
+| `No account owns domain` | No configured key can see that domain. The message lists each account and its domains. |
+| `No domain X on this account` with `--account` | The named account does not own that domain. Drop `--account` to let the CLI find the owner. |
+| `folders must be a string or a one-line array` | A `folders` value could not be read, often an array split over several lines. Put it on one line. |
+| `this section header is not [accounts.<name>]` | A header on that line is mistyped, or is not an account section. Fix it or remove it, because a mistyped header would drop that account. |
 
 Exit code 2 from the CLI is a configuration or usage problem, exit code 1 is an API or
 network error.

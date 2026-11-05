@@ -94,6 +94,66 @@ The source reads `env`, `file` or `op`. Because the plugin config field arrives 
 environment variable of its own, it and `SHORT_IO_API_KEY` both report as `env`, so that word
 does not tell you which of the two answered. Unset one and re-run if it matters.
 
+## More than one account
+
+Give each account its own section in the config file. One-key setups need none of this and
+keep working with no change.
+
+```toml
+default = "agency"
+
+[accounts.agency]
+api_key = "sk_..."
+
+[accounts.clinic]
+api_key = "sk_..."
+folders = ["~/code/clinic-site", "~/code/clinic-shop"]
+```
+
+A section takes `api_key`, or `op_ref` with an optional `op_account`, plus an optional
+`folders`, which is one string or a one-line array. `default` names the account for any folder
+no account lists, and with one account it may be left out.
+
+The two surfaces pick the account differently.
+
+| Surface | How it picks | What that means |
+|---|---|---|
+| MCP tools | The account for the session's folder, else `default` | One account per session. A folder matches itself and everything under it, and the longest match wins |
+| CLI | The account that owns the domain you give it | Every account, from any folder. `--account <name>` pins it to one |
+
+So a link for the other account goes through the CLI. Statistics and edits have no CLI command,
+so for those open a session in a folder of the account that owns the domain.
+
+`whoami` prints every account, its key source, its folders and its domains, then the default
+account and the account this folder's MCP tools use. The bridge writes the same answer to its
+stderr when it starts. It works from the folder Claude Code starts it in, which is observed
+behaviour rather than a documented contract, so check `whoami` when it matters.
+
+**The settings fields must be empty.** A key in the plugin settings field or in
+`SHORT_IO_API_KEY` beside named accounts is an error in both surfaces, because the two keys
+could silently compete. The same goes for the 1Password fields and variables. The bridge
+refuses to start and the CLI exits 2, and both say what to change.
+
+These are errors too, each with the fix in the message.
+
+- A top-level `api_key` or `op_ref` beside `[accounts.*]` sections.
+- `default` naming an account that does not exist.
+- A section with neither `api_key` nor `op_ref`.
+- The same folder listed by two accounts, compared after resolving symlinks.
+- A repeated section, or a key set twice in one section.
+- A `folders` value that cannot be read, or an entry that is not a full path or `~/` path.
+- Any section header other than `[accounts.<name>]` beside named accounts, because a mistyped
+  header would drop that account and send its folders to the default.
+- More than one account, no `default`, and a folder no account lists (the bridge only).
+
+In a one-key file, a section header that looks like an account (`[account.x]`) is an error too.
+Any other `[section]` there is skipped with a warning, and its keys are ignored. A listed folder
+that does not exist gets a warning, so a typo cannot quietly send a session to the default.
+
+To move from one key to two, put `[accounts.<name>]` above your existing `api_key` line, add
+the second section and any `folders`, add `default = "<name>"` as the first line, clear the
+plugin settings fields, then restart and run `whoami`. `/short-io:setup` has the steps.
+
 ## The bare-key gotcha
 
 Short.io wants the key bare in the `authorization` header. The `Bearer` prefix that nearly
@@ -140,12 +200,13 @@ after a timeout without checking first whether it already landed.
 
 ## What you get - CLI
 
-`${CLAUDE_PLUGIN_ROOT}/bin/short-io <command>`. Every command takes `--json`.
+`${CLAUDE_PLUGIN_ROOT}/bin/short-io <command>`. Every command takes `--json` and
+`--account <name>`.
 
 | Command | The problem it solves |
 |---|---|
-| `whoami [--json]` | Proves the key works, and says which of the four methods supplied it |
-| `domains [--json]` | The numeric id and the hostname together, because the read and statistics tools want the id and create wants the hostname |
+| `whoami [--json]` | Proves each key works, says which of the four methods supplied it, and names the account this folder's MCP tools use |
+| `domains [--json]` | The numeric id and the hostname together, because the read and statistics tools want the id and create wants the hostname. Names the account when the config file has named accounts |
 | `links <domain\|id> [--json\|--csv] [--include-archived]` | Every link on the domain, paged past the 150 row limit to the true total, which the hosted list tool leaves you to page yourself |
 | `check <domain/slug \| https://host/slug> [--json]` | What the slug is actually configured to do, the live hop, and whether the domain 404s or falls back, which no HTTP status can tell you |
 | `create <domain> <url> [--path s] [--title t] [--tags a,b] [--allow-duplicate] [--json]` | A create that checks the slug and the destination first, so a silently returned existing record is reported as `exists`, never as new |
@@ -166,7 +227,7 @@ The bulk results CSV columns are `row,url,path,action,short_url,id,note`.
 | Skill | What it does |
 |---|---|
 | `short-io` | Overview and router - the two ways in, which surface for which job, the id rules, the quirks |
-| `/short-io:setup` | First-run setup - create a secret key, choose how it is supplied, clear a stale MCP entry, verify with `whoami` |
+| `/short-io:setup` | First-run setup - create a secret key, choose how it is supplied, add a second account, clear a stale MCP entry, verify with `whoami` |
 | `create-link` | One link with duplicate checks, titles, tags and UTM fields, then a destination verification |
 | `bulk-links` | Many links from a CSV or JSON file, dry run first, then create with counts and a results CSV |
 | `audit-links` | Every link on a domain, what one or many slugs really point at, and a reconcile of a destination list against the account |
@@ -199,6 +260,9 @@ The bulk results CSV columns are `row,url,path,action,short_url,id,note`.
 | `Unauthorized: No API key provided` | The header was malformed or the value was empty, so the key itself may be fine. Check for a `Bearer ` prefix and for an empty config value |
 | A message about a `pk_` key | A public key was supplied. Create a secret key with the "Public key" toggle OFF |
 | `no API key configured` | None of the four methods answered. Re-check the key section above, then re-run `whoami` |
+| The MCP tools do not start, with a message about `[accounts.*]` sections and the settings field | A key is in the plugin settings field or the environment beside named accounts. Move it into a section and clear the field |
+| `get-domains` does not list a domain you own | The domain belongs to another account, and the MCP tools serve this folder's account only. Use the CLI, or open a session in that account's folder |
+| `No account owns domain` | No configured key can see that domain. The message lists each account and its domains |
 | `mcp-remote is not installed` | The SessionStart hook has not run or failed. Run `scripts/install-deps.sh` from the plugin directory, then restart |
 | The MCP tools are missing but the CLI works | Desktop sessions sometimes do not spawn plugin MCP servers. The CLI is the fallback, not a reason to stop |
 | Duplicate `short-io` tools | An MCP server of the same name was added by hand in an earlier session. `claude mcp remove short-io -s user`, and the same at project scope |

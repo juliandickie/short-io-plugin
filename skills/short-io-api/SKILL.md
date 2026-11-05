@@ -32,7 +32,7 @@ REST limit and the two do not share a counter.
 | `GET /api/domains` | 200, a JSON array. Per domain, `id` (number), `hostname`, `linkType` (`eight-char` or `random`), `redirect404` (null when unset), `state`. `GET /api/domains/:id` is not a route and answers 404. |
 | `GET /api/links?domain_id=<number>&limit=<n>[&pageToken=<token>]` | 200 `{count, links[], nextPageToken}`. `domain_id` is required and numeric; sending `domain=<hostname>` answers 400 `must have required property domain_id`. `limit` maximum is 150, 151 answers 400. `count` is the true total on every page. `nextPageToken` is absent on the last page; pass it back as `pageToken`. |
 | `GET /links/expand?domain=<hostname>&path=<slug>` | 200 with the record when the slug exists, 404 `{"error":"Link not found"}` when it is free or after a delete. Here `domain` is the hostname, not the id. This is the only endpoint that tells the truth about a slug. |
-| `GET /links/multiple-by-url?domain=<hostname>&originalURL=<url-encoded>` | 200 `{links[]}`, every link on the domain whose destination matches exactly. This is the dedupe-by-destination check. Records also carry `slugSuggestions` and `tagSuggestions`. No `count`, no paging. |
+| `GET /links/multiple-by-url?domain=<hostname>&originalURL=<url-encoded>` | 200 `{links[]}`, every link on the domain whose destination matches exactly. 404 `{"error":"No links found"}` when none matches, and 404 `{"error":"Domain not found"}` for an unknown domain, so only the first means none. This is the dedupe-by-destination check. Records also carry `slugSuggestions` and `tagSuggestions`. No `count`, no paging. |
 | `GET /links/<idString>` | 200 with the record. |
 | `POST /links` | Body `{domain, originalURL, path?, title?, tags?[]}`, `domain` is the hostname. See the create cases below. |
 | `DELETE /links/<idString>` | 200 `{"success":true,"idString":...}`. A second delete answers 404. Expand after delete answers 404. |
@@ -126,7 +126,7 @@ An unknown property answers HTTP 500, so send only documented arguments.
 - `get-link-list` returns at most 150 links per call, carries the true total in `count`, and
   pages with `beforeDate` set to the oldest `createdAt` of the previous page.
 - `splitURL` with `splitPercent` sets an A/B split; `expiresAt` and `clicksLimit` set the
-  expiry conditions. None of these have CLI flags in v0.1.
+  expiry conditions. None of these have CLI flags.
 
 ## CLI command table
 
@@ -134,13 +134,25 @@ Invoked as `${CLAUDE_PLUGIN_ROOT}/bin/short-io <command>`.
 
 | Command | What it prints |
 |---|---|
-| `whoami [--json]` | key source, domains, link counts |
-| `domains [--json]` | id, hostname, type, redirect404 per domain |
+| `whoami [--json]` | per account - key source, folders, domains, link counts. Then the default account and the account this folder's MCP tools use |
+| `domains [--json]` | id, hostname, type, redirect404 per domain, with an account column when the file has named accounts |
 | `links <domain\|id> [--json\|--csv] [--include-archived]` | every link, paged to the end |
 | `check <domain/slug \| https://host/slug> [--json]` | configured target, live hop, fallback probe, verdict |
 | `create <domain> <url> [--path s] [--title t] [--tags a,b] [--allow-duplicate] [--json]` | the action and the link |
 | `bulk create <file.csv\|file.json> --domain <d> [--yes] [--allow-duplicate] [--out results.csv]` | a dry-run table, or counts plus a results CSV |
 | `delete <domain/slug> --yes [--json]` | the deleted slug |
+
+Every command takes `--account <name>`. Without it, `links`, `check`, `create`, `bulk create`
+and `delete` use the account that owns the domain, trying the folder's account, then the
+default, then the rest of the file. Each account tried costs one listing call. With one account
+`check` and `delete` make no lookup. An API error or a key failure while searching stops the
+command and never moves on to the next account.
+
+`whoami --json` keeps `key_source`, `config_path`, `data_dir` and `domains`, describing this
+folder's account or the `--account` one, and adds `default`, `folder`, `folder_account` and
+`accounts: [{ name, key_source, folders, domains, error }]`. `domains --json` adds `account` to
+each domain object, and a failing account is a row of `{ account, error }`. Both commands
+report every account and exit 1 if any failed.
 
 Exit codes - 0 ok, 1 API or network error, 2 configuration or usage. `create` additionally
 returns 0 for the actions `created` and `exists`, and 1 for `taken`, `duplicate` and

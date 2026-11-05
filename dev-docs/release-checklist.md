@@ -20,7 +20,8 @@
    ```
 
    It uses the real plugin data dir unless `SHORT_IO_PLUGIN_DATA` says otherwise, so the
-   `mcp-remote` it runs is the one the SessionStart hook installed.
+   `mcp-remote` it runs is the one the SessionStart hook installed. With named accounts it
+   answers for the account of the folder it runs in, so run it from one folder per account.
 
    Interactive - after a listing change, reinstall locally and confirm the cache version, then
    run the installed CLI from a terminal session and confirm the MCP tools appear (desktop

@@ -7,7 +7,9 @@ combines two access paths, Short.io's hosted MCP server for the interactive tool
 edit, search, and measure short links) and a local REST gap CLI for the operations the hosted
 MCP does not do well, full link enumeration on a domain, destination checks on a slug,
 deduplicated bulk creation from a CSV, and deletion. The two paths share one configured key
-resolver, so the user sets credentials once and gets both surfaces. Sibling plugins (Heyzine
+resolver, so the user sets credentials once and gets both surfaces. A user with two Short.io
+accounts names them in the config file, and each link lands in the right account for where it
+is made. Sibling plugins (Heyzine
 for flipbooks, Scribe for Drive and Docs, wp-manager and the academy tooling for LearnDash)
 are composed by capability reference in skill prose, never by importing their tools.
 
@@ -42,7 +44,9 @@ plugin behaviour.
 existing path with the same destination, or a missing path with an already shortened
 destination, answers 200 with the EXISTING record and creates nothing. On a domain with a
 default fallback configured there is no 404, so an unknown slug redirects exactly like a real
-one and only `GET /links/expand` tells the truth about a slug. Rate limits are per endpoint
+one and only `GET /links/expand` tells the truth about a slug. `GET /links/multiple-by-url` answers
+404 `No links found` for a destination with no links and 404 `Domain not found` for an unknown
+domain, so only the first means none. Rate limits are per endpoint
 family read from `x-ratelimit-limit`, 1000 for listing, 50 for link creation, 20 for link info
 and delete, and the hosted MCP endpoint's 30 per minute is a separate budget. The key goes in
 the `authorization` header bare; a `Bearer ` prefix answers the same 401 as no header at all.
@@ -63,6 +67,27 @@ The key resolver reads the environment variable BEFORE the plugin config field, 
 the config field reads as the more specific setting. `.mcp.json` maps the field onto the same
 env var, so by the time the bridge runs the two are indistinguishable, and a rule that claimed
 to prefer one over the other would be describing something the process cannot see.
+
+That precedence applies only to a single-key setup. Once the config file has `[accounts.*]`
+sections, there is no precedence at all, because any of the three Short.io settings in the
+environment is an error (`loadAccounts`, in the bridge and the CLI). The settings field reaches
+only the bridge and never the Bash tool, so letting it win would put the MCP tools and the CLI
+in one session on different accounts with nothing to say so.
+
+The bridge picks its account from its working folder, which is observed behaviour rather than a
+documented contract (19 bridges checked with `lsof`, 2026-11-05), so `whoami` and the bridge's
+stderr line both name the account. The CLI routes by domain, and any error while routing stops
+the command instead of moving on, because moving on could create a link in the wrong account.
+There is no domain cache, so each routed command spends one listing call per account tried.
+
+A section header other than `[accounts.<name>]` is an error beside named accounts, not a
+warning, because a mistyped header drops that account's key and folders and sends its sessions
+to the default. Bridge stderr is not shown to the user, so a warning there would not be seen.
+
+`parseToml` scopes keys to their section. It used to merge every section into the top level,
+which let the last `api_key` in a file silently win, and 0.1.0 still reads a file that way. So
+on a machine moving from 0.1.0, keep the account the old CLI should read as the last section
+until the new version is installed.
 
 ## Versioning
 
