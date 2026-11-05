@@ -11,3 +11,23 @@ already attempted. The next session connects normally. Workaround - open a new s
 run `scripts/install-deps.sh` with `CLAUDE_PLUGIN_ROOT` set before the first session.
 Possible fix for 0.1.1 - have `run-mcp.mjs` run the installer itself when `proxy.js` is
 missing, then continue, instead of exiting.
+
+## 2026-11-05 - hosted MCP session lost, the app keeps reporting the bridge as connected
+
+Seen in a Pro Marketing session (clients/ascot-re). Every hosted MCP call returned `Bad
+Request: No valid session ID provided` from mcp-remote, while the REST CLI worked with the
+same machine and network. The app did not re-dial the server, because it still reported it as
+connected. A fresh session's bridge answered `get-domains` normally the same day. Workaround -
+open a new session, or use the CLI for the operation. Possible fix - have the launcher restart
+mcp-remote when it reports a lost session, if mcp-remote exposes that; check upstream first.
+
+## 2026-11-05 - the settings field and the config file can point at different accounts
+
+The plugin settings field reaches only the MCP bridge (Claude Code passes it as
+`SHORT_IO_API_KEY` to the bridge, never to the Bash tool), and the environment wins over the
+config file. With one account's key in the settings field and another's in `config.toml`, the
+MCP tools and the CLI in the same session write to different Short.io accounts with no
+warning. Proved on the maintainer's machine - `get-domains` answered one account's domains and
+`short-io whoami` the other's. The fix is the multi-account design (named accounts in
+`config.toml`, the bridge picking its account by session folder, and an error when the settings
+field is also set), planned for 0.2.0.
