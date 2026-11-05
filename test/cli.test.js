@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { run, usage } from '../lib/cli.mjs';
+import { loadAccounts, resolveKey } from '../lib/config.mjs';
+import { ShortIoError } from '../lib/client.mjs';
 
 const DOMAINS = [{ id: 12345, hostname: 'go.example.com', linkType: 'eight-char', redirect404: null }];
 function ctx(over = {}) {
@@ -17,6 +19,7 @@ function ctx(over = {}) {
   return {
     c: {
       env: {}, stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => err.push(s) },
+      loadAccounts: async () => ({ named: false, accounts: [{ name: 'default', folders: [] }], default: 'default', folder: '/work', folderAccount: 'default', rule: 'single key' }),
       resolveKey: async () => ({ key: 'sk_T', source: 'file' }), makeClient: () => client,
       fetch: async (url) => ({ status: url.includes('zz-probe') || url.endsWith('/a') ? 302 : 404, headers: { get: (k) => (k === 'location' ? 'https://example.com/a' : null) } }),
       readFile: async (p) => files[p] ?? (() => { throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' }); })(),
@@ -139,4 +142,185 @@ test('a results file that cannot be written still reports the counts and exits 1
   assert.equal(await run(['bulk', 'create', '/in.csv', '--domain', 'go.example.com', '--yes'], h.c), 1);
   const err = h.err.join('');
   assert.match(err, /created\s+1/); assert.match(err, /cannot write \/in-results\.csv/); assert.match(err, /read-only file system/);
+});
+
+const TWO = ['default = "pm"', '', '[accounts.pm]', 'api_key = "sk_PM"', '', '[accounts.idd]', 'api_key = "sk_IDD"', 'folders = ["/srv/idd"]'].join('\n');
+const DOMAINS_OF = { pm: [{ id: 1, hostname: 'pm.example', linkType: 'random', redirect404: null }], idd: [{ id: 2, hostname: 'idd.example', linkType: 'eight-char', redirect404: null }] };
+
+function fakeClient(name, calls, over = {}) {
+  const deleted = new Set();
+  return {
+    listDomains: async () => { calls.push(`${name}:listDomains`); return DOMAINS_OF[name]; },
+    listLinks: async () => { calls.push(`${name}:listLinks`); return { count: 1, links: [{ path: 'a', originalURL: 'https://example.com/a', idString: `${name}-1`, archived: false }] }; },
+    expand: async (d, p) => { calls.push(`${name}:expand:${d}`); return p === 'a' && !deleted.has(p) ? { idString: `${name}-1`, originalURL: 'https://example.com/a' } : null; },
+    linksByUrl: async () => [],
+    createLink: async (b) => { calls.push(`${name}:create:${b.domain}`); return { idString: `${name}-2`, path: b.path, shortURL: `https://${b.domain}/${b.path}`, createdAt: new Date().toISOString() }; },
+    deleteLink: async (id) => { calls.push(`${name}:delete:${id}`); deleted.add('a'); return { success: true }; },
+    ...over,
+  };
+}
+
+// The real loader and resolver over fake file text, with one fake client per API key, so a test
+// reads which account was opened and what was called on it.
+function accounts({ cwd = '/work', config = TWO, pm = {}, idd = {}, env = {} } = {}) {
+  const out = []; const err = []; const calls = []; const opened = []; const files = {};
+  const clients = { sk_PM: fakeClient('pm', calls, pm), sk_IDD: fakeClient('idd', calls, idd) };
+  return {
+    c: {
+      env, stdout: { write: (s) => out.push(s) }, stderr: { write: (s) => err.push(s) },
+      loadAccounts: (d) => loadAccounts({ ...d, homedir: () => '/home/tester', readFile: async () => config, stat: async () => ({ mode: 0o600 }), realpath: async (p) => p, cwd: () => cwd }),
+      resolveKey,
+      makeClient: ({ key }) => { opened.push(key); return clients[key]; },
+      fetch: async () => ({ status: 404, headers: { get: () => null } }),
+      readFile: async (p) => files[p], writeFile: async (p, text) => { files[p] = text; }, sleep: async () => {}, random: () => 'zz-probe',
+    },
+    out, err, calls, opened, files,
+  };
+}
+
+test('create routes to the account that owns the domain', async () => {
+  const h = accounts();
+  assert.equal(await run(['create', 'idd.example', 'https://example.com/z', '--path', 'z', '--json'], h.c), 0);
+  assert.equal(JSON.parse(h.out.join('')).action, 'created');
+  assert.deepEqual(h.opened, ['sk_PM', 'sk_IDD']);
+  assert.equal(h.calls.includes('idd:create:idd.example'), true);
+  assert.equal(h.calls.some((call) => call.startsWith('pm:create')), false);
+});
+
+test('the working folder account is tried first, and the other key is never read', async () => {
+  const h = accounts({ cwd: '/srv/idd/sub', config: TWO.replace('sk_PM', 'pk_WOULD_FAIL_IF_READ') });
+  assert.equal(await run(['create', 'idd.example', 'https://example.com/z', '--path', 'z', '--json'], h.c), 0);
+  assert.deepEqual(h.opened, ['sk_IDD']);
+  assert.deepEqual(h.calls.filter((call) => call.endsWith('listDomains')), ['idd:listDomains']);
+});
+
+test('the default is tried before the rest of the file', async () => {
+  const h = accounts({ config: TWO.replace('default = "pm"', 'default = "idd"') });
+  assert.equal(await run(['links', 'idd.example', '--json'], h.c), 0);
+  assert.deepEqual(h.opened, ['sk_IDD']);
+});
+
+test('--account uses that account only', async () => {
+  const h = accounts();
+  assert.equal(await run(['create', 'idd.example', 'https://example.com/z', '--path', 'z', '--account', 'idd', '--json'], h.c), 0);
+  assert.deepEqual(h.opened, ['sk_IDD']);
+});
+
+test('a domain the named account does not own gets the No domain error, with no fallback', async () => {
+  for (const args of [['create', 'pm.example', 'https://example.com/z'], ['links', 'pm.example'], ['check', 'pm.example/a'], ['delete', 'pm.example/a', '--yes']]) {
+    const h = accounts();
+    assert.equal(await run([...args, '--account', 'idd'], h.c), 2, args[0]);
+    assert.match(h.err.join(''), /No domain "pm\.example" on this account/);
+    assert.deepEqual(h.opened, ['sk_IDD'], args[0]);
+  }
+});
+
+test('an unknown account is a usage error listing the names, before any key is read', async () => {
+  for (const flag of [['--account', 'nope'], ['--account=']]) {
+    const h = accounts();
+    assert.equal(await run(['links', 'idd.example', ...flag], h.c), 2);
+    assert.match(h.err.join(''), /Accounts: pm, idd/);
+    assert.deepEqual(h.opened, []);
+  }
+});
+
+test('a domain no account owns lists each account and its domains', async () => {
+  const h = accounts();
+  assert.equal(await run(['create', 'nope.example', 'https://example.com/z'], h.c), 2);
+  const err = h.err.join('');
+  assert.match(err, /nope\.example/);
+  assert.match(err, /pm.*pm\.example \(1\)/s);
+  assert.match(err, /idd.*idd\.example \(2\)/s);
+  assert.equal(h.calls.some((call) => call.includes(':create')), false);
+});
+
+test('an API error while routing stops the command and never tries the next account', async () => {
+  const h = accounts({ pm: { listDomains: async () => { throw new ShortIoError('auth', 'rejected'); } } });
+  assert.equal(await run(['create', 'idd.example', 'https://example.com/z'], h.c), 1);
+  assert.match(h.err.join(''), /account "pm".*rejected/s);
+  assert.deepEqual(h.opened, ['sk_PM']);
+  assert.equal(h.calls.some((call) => call.includes(':create')), false);
+});
+
+test('a key that fails to resolve while routing stops the command', async () => {
+  const h = accounts({ config: TWO.replace('sk_PM', 'pk_BAD') });
+  assert.equal(await run(['create', 'idd.example', 'https://example.com/z'], h.c), 2);
+  assert.match(h.err.join(''), /account "pm".*Public key toggle/s);
+  assert.equal(h.err.join('').includes('pk_BAD'), false);
+  assert.deepEqual(h.opened, []);
+});
+
+test('links, by hostname or id, reads the owning account', async () => {
+  const h = accounts();
+  assert.equal(await run(['links', '2', '--json'], h.c), 0);
+  assert.equal(JSON.parse(h.out.join('')).domain, 'idd.example');
+  assert.equal(h.calls.includes('idd:listLinks'), true);
+  assert.equal(h.calls.includes('pm:listLinks'), false);
+});
+
+test('check finds the owner before expand', async () => {
+  const h = accounts();
+  assert.equal(await run(['check', 'idd.example/a', '--json'], h.c), 0);
+  assert.equal(JSON.parse(h.out.join('')).domain, 'idd.example');
+  assert.deepEqual(h.calls, ['pm:listDomains', 'idd:listDomains', 'idd:expand:idd.example']);
+});
+
+test('bulk create routes its dry run and its run to the owner', async () => {
+  const h = accounts();
+  h.c.readFile = async () => 'url,path\nhttps://example.com/1,one\n';
+  assert.equal(await run(['bulk', 'create', '/in.csv', '--domain', 'idd.example', '--json'], h.c), 0);
+  assert.equal(JSON.parse(h.out.join('')).domain, 'idd.example');
+  assert.equal(h.calls.some((call) => call.startsWith('pm:expand')), false);
+  const r = accounts();
+  r.c.readFile = h.c.readFile;
+  assert.equal(await run(['bulk', 'create', '/in.csv', '--domain', 'idd.example', '--yes', '--out', '/r.csv'], r.c), 0);
+  assert.equal(r.calls.includes('idd:create:idd.example'), true);
+  assert.equal(r.calls.some((call) => call.startsWith('pm:create')), false);
+});
+
+test('delete routes to the owner and deletes there only', async () => {
+  const h = accounts();
+  assert.equal(await run(['delete', 'idd.example/a', '--yes', '--json'], h.c), 0);
+  assert.equal(JSON.parse(h.out.join('')).deleted, 'idd-1');
+  assert.equal(h.calls.includes('idd:delete:idd-1'), true);
+  assert.equal(h.calls.some((call) => call.startsWith('pm:delete')), false);
+});
+
+test('with one account check and delete make no domain lookup, so an outside domain still answers', async () => {
+  const noLookup = { listDomains: async () => { throw new Error('no lookup expected'); } };
+  const single = ctx({ client: noLookup });
+  assert.equal(await run(['check', 'outside.example/a', '--json'], single.c), 0);
+  assert.equal(JSON.parse(single.out.join('')).domain, 'outside.example');
+  const one = accounts({ config: '[accounts.pm]\napi_key = "sk_PM"', pm: noLookup });
+  assert.equal(await run(['check', 'outside.example/a', '--json'], one.c), 0);
+  const del = accounts({ config: '[accounts.pm]\napi_key = "sk_PM"', pm: noLookup });
+  assert.equal(await run(['delete', 'outside.example/a', '--yes', '--json'], del.c), 0);
+  assert.equal(del.calls.includes('pm:delete:pm-1'), true);
+});
+
+test('--account default selects the single key, and any other name is unknown', async () => {
+  const yes = ctx(); assert.equal(await run(['links', 'go.example.com', '--account', 'default', '--json'], yes.c), 0);
+  const no = ctx(); assert.equal(await run(['links', 'go.example.com', '--account', 'idd'], no.c), 2);
+  assert.match(no.err.join(''), /Accounts: default/);
+});
+
+test('single-key messages stay as 0.1.0 wrote them, with no account prefix', async () => {
+  const h = ctx();
+  assert.equal(await run(['links', 'nope.example'], h.c), 2);
+  assert.equal(h.err.join(''), 'short-io: No domain "nope.example" on this account. Domains: go.example.com (12345)\n');
+  const a = ctx({ client: { listDomains: async () => { throw new ShortIoError('auth', 'rejected'); } } });
+  assert.equal(await run(['links', 'go.example.com'], a.c), 1);
+  assert.equal(a.err.join(''), 'short-io: rejected\n');
+});
+
+test('a key in the settings field beside named accounts stops the CLI too', async () => {
+  const h = accounts({ env: { SHORT_IO_API_KEY: 'sk_ENV' } });
+  assert.equal(await run(['links', 'idd.example'], h.c), 2);
+  assert.match(h.err.join(''), /SHORT_IO_API_KEY.*settings field/s);
+  assert.equal(h.err.join('').includes('sk_ENV'), false);
+  assert.deepEqual(h.opened, []);
+});
+
+test('usage names the --account flag', () => {
+  assert.match(usage(), /--account <name>/);
 });
