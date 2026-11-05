@@ -31,3 +31,12 @@ warning. Proved on the maintainer's machine - `get-domains` answered one account
 `short-io whoami` the other's. The fix is the multi-account design (named accounts in
 `config.toml`, the bridge picking its account by session folder, and an error when the settings
 field is also set), planned for 0.2.0.
+
+## 2026-11-05 - fixed in 0.2.0 - the settings field and the config file
+
+Named accounts close the split in the entry above. Each account has its own key in
+`config.toml`, and any Short.io setting in the environment beside them is an error.
+
+A single-key setup can still split the same way, because its chain did not change. With one key
+in the settings field and a different top-level `api_key` in the file, the MCP tools and the CLI
+still use different accounts. The fix for that user is named accounts, or one key in one place.

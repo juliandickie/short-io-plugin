@@ -126,7 +126,7 @@ An unknown property answers HTTP 500, so send only documented arguments.
 - `get-link-list` returns at most 150 links per call, carries the true total in `count`, and
   pages with `beforeDate` set to the oldest `createdAt` of the previous page.
 - `splitURL` with `splitPercent` sets an A/B split; `expiresAt` and `clicksLimit` set the
-  expiry conditions. None of these have CLI flags in v0.1.
+  expiry conditions. None of these have CLI flags.
 
 ## CLI command table
 
@@ -134,13 +134,25 @@ Invoked as `${CLAUDE_PLUGIN_ROOT}/bin/short-io <command>`.
 
 | Command | What it prints |
 |---|---|
-| `whoami [--json]` | key source, domains, link counts |
-| `domains [--json]` | id, hostname, type, redirect404 per domain |
+| `whoami [--json]` | per account - key source, folders, domains, link counts. Then the default account and the account this folder's MCP tools use |
+| `domains [--json]` | id, hostname, type, redirect404 per domain, with an account column when the file has named accounts |
 | `links <domain\|id> [--json\|--csv] [--include-archived]` | every link, paged to the end |
 | `check <domain/slug \| https://host/slug> [--json]` | configured target, live hop, fallback probe, verdict |
 | `create <domain> <url> [--path s] [--title t] [--tags a,b] [--allow-duplicate] [--json]` | the action and the link |
 | `bulk create <file.csv\|file.json> --domain <d> [--yes] [--allow-duplicate] [--out results.csv]` | a dry-run table, or counts plus a results CSV |
 | `delete <domain/slug> --yes [--json]` | the deleted slug |
+
+Every command takes `--account <name>`. Without it, `links`, `check`, `create`, `bulk create`
+and `delete` use the account that owns the domain, trying the folder's account, then the
+default, then the rest of the file. Each account tried costs one listing call. With one account
+`check` and `delete` make no lookup. An API error or a key failure while searching stops the
+command and never moves on to the next account.
+
+`whoami --json` keeps `key_source`, `config_path`, `data_dir` and `domains`, describing this
+folder's account or the `--account` one, and adds `default`, `folder`, `folder_account` and
+`accounts: [{ name, key_source, folders, domains, error }]`. `domains --json` adds `account` to
+each domain object, and a failing account is a row of `{ account, error }`. Both commands
+report every account and exit 1 if any failed.
 
 Exit codes - 0 ok, 1 API or network error, 2 configuration or usage. `create` additionally
 returns 0 for the actions `created` and `exists`, and 1 for `taken`, `duplicate` and

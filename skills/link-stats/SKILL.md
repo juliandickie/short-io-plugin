@@ -9,6 +9,9 @@ argument-hint: "<domain or domain/slug> [--period 7d|30d|custom]"
 Statistics live entirely on the hosted MCP tools. The CLI has no stats command and no
 `--period` flag; the period in the argument hint describes the request, not a CLI argument.
 
+With two or more accounts, the MCP tools serve only the account for this session's folder. If
+`get-domains` does not list the domain, open a session in a folder of the account that owns it.
+
 ## Which tool for which question
 
 | The question | Tool |
@@ -26,7 +29,7 @@ columns such as `utm_campaign`, `utm_source` and `utm_medium`.
 ## Ids you need first
 
 Every statistics tool takes the numeric `domainId`, never a hostname. Get it from the
-`get-domains` tool, or from the CLI.
+`get-domains` tool, or from the CLI, which also names the account.
 
 ```bash
 ${CLAUDE_PLUGIN_ROOT}/bin/short-io domains

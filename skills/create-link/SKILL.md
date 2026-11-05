@@ -16,7 +16,8 @@ record rather than an error, so an MCP-first create can silently report an old l
 ${CLAUDE_PLUGIN_ROOT}/bin/short-io domains
 ```
 
-Take the hostname for the create call and note the numeric id in case stats come next.
+Take the hostname for the create call and note the numeric id in case stats come next. With
+two or more accounts, the first column names the account for each domain.
 
 ## 2 Create
 
@@ -25,6 +26,8 @@ ${CLAUDE_PLUGIN_ROOT}/bin/short-io create go.example.com https://example.com/spr
 ```
 
 Every flag after the URL is optional. Without `--path`, the domain generates a random slug.
+With two or more accounts, the CLI creates the link in the account that owns the domain, from
+any folder.
 
 ## 3 Read the action
 
@@ -41,13 +44,17 @@ The `action` field in the JSON is the whole answer. Exit code 0 covers `created`
 
 ## 4 UTM and A and B fields
 
-The CLI does not carry UTM, split-test, device or expiry flags in v0.1. When the user wants
-any of those, confirm the slug is available first with `check` (a verdict of `free`,
+The CLI does not carry UTM, split-test, device or expiry flags. When the user wants any of
+those, confirm the slug is available first with `check` (a verdict of `free`,
 `free-but-redirects` or `free-but-served` means nothing holds it), then make the link with the hosted
 `create-short-link` tool, passing `domain` as the hostname plus `originalURL`,
 `path`, `title`, `tags`, and whichever of `utmSource`, `utmMedium`, `utmCampaign`, `utmTerm`,
 `utmContent`, `splitURL`, `splitPercent`, `androidURL`, `iphoneURL`, `expiresAt`,
 `clicksLimit` apply. Send nothing else; an unknown property answers HTTP 500.
+
+**Warning** - with two or more accounts, `create-short-link` serves only the account for this
+session's folder. If `get-domains` does not list the domain, the domain belongs to another
+account. Use the CLI, or open a session in a folder of that account.
 
 ## 5 Verify
 

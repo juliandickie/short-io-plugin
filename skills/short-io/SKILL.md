@@ -41,6 +41,17 @@ It talks to the REST API directly and is invoked as
 | Delete a link | CLI `delete`, or MCP `call-api` with method DELETE |
 | Clicks, countries, referrers, campaigns | MCP statistics tools |
 
+## Two or more accounts
+
+When the config file has named accounts, the two surfaces pick differently. The MCP tools serve
+the account for the session's folder, or the default account, and only that account for the
+whole session. The CLI finds the account that owns the domain you give it, so it reaches every
+account from any folder, and `--account <name>` pins it to one.
+
+So a link for the other account goes through the CLI. Statistics and edits have no CLI command,
+so for those open a session in a folder of the account that owns the domain. `whoami` prints
+which account this folder's MCP tools use.
+
 ## Which skill
 
 | The user asks | Skill |
@@ -60,7 +71,7 @@ Short.io identifies a domain two ways and the surfaces disagree about which they
 A link is identified by its `idString`, not its slug.
 
 `${CLAUDE_PLUGIN_ROOT}/bin/short-io domains` prints both the numeric id and the hostname for
-every domain on the account, so run it once and carry both.
+every domain on every account, so run it once and carry both.
 
 ## Quirks
 
