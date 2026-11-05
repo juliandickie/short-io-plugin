@@ -44,7 +44,9 @@ plugin behaviour.
 existing path with the same destination, or a missing path with an already shortened
 destination, answers 200 with the EXISTING record and creates nothing. On a domain with a
 default fallback configured there is no 404, so an unknown slug redirects exactly like a real
-one and only `GET /links/expand` tells the truth about a slug. Rate limits are per endpoint
+one and only `GET /links/expand` tells the truth about a slug. `GET /links/multiple-by-url` answers
+404 `No links found` for a destination with no links and 404 `Domain not found` for an unknown
+domain, so only the first means none. Rate limits are per endpoint
 family read from `x-ratelimit-limit`, 1000 for listing, 50 for link creation, 20 for link info
 and delete, and the hosted MCP endpoint's 30 per minute is a separate budget. The key goes in
 the `authorization` header bare; a `Bearer ` prefix answers the same 401 as no header at all.

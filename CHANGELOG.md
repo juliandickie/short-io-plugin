@@ -22,6 +22,10 @@ Fixed - the config parser merged every `[section]` into the top level, so the la
 a file silently won. Keys now belong to their section. In a one-key file, any other section is
 skipped with a warning.
 
+Fixed - `create` and `bulk create` stopped with `links/multiple-by-url: No links found` for any
+destination with no link on that domain yet, which is the normal case. The API answers 404
+there, and the client treated it as an error. This was present since 0.1.0.
+
 Changed - if you had keys under another `[section]` of the config file, they are now ignored.
 Move them to the top level or into an account.
 

@@ -163,6 +163,18 @@ test('linksByUrl unwraps both the wrapped and the bare array shape', async () =>
   assert.deepEqual(await c.linksByUrl('go.example.com', 'https://example.com/'), []);
 });
 
+test('linksByUrl reads a 404 "No links found" as no links', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(404, { error: 'No links found' })]);
+  assert.deepEqual(await c.linksByUrl('go.example.com', 'https://example.com/new'), []);
+});
+
+test('linksByUrl still throws on any other 404', async () => {
+  const calls = []; calls.sleeps = [];
+  const c = client(calls, [res(404, { error: 'Domain not found' })]);
+  await assert.rejects(c.linksByUrl('nope.example.com', 'https://example.com/new'), (e) => e.code === 'not_found' && /Domain not found/.test(e.message));
+});
+
 test('a 403 is auth', async () => {
   const calls = []; calls.sleeps = [];
   const c = client(calls, [res(403, { error: 'Forbidden' })]);
