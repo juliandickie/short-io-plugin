@@ -32,7 +32,7 @@ test('configPath honours XDG_CONFIG_HOME', () => {
 });
 
 test('readConfigFile returns exists=false on ENOENT and warns on loose permissions', async () => {
-  assert.deepEqual(await readConfigFile({ env: {}, homedir: home, ...fileAt({}) }), { path: CFG, values: {}, exists: false });
+  assert.deepEqual(await readConfigFile({ env: {}, homedir: home, ...fileAt({}) }), { path: CFG, values: {}, sections: [], exists: false });
   const warnings = [];
   const loose = await readConfigFile({ env: {}, homedir: home, ...fileAt({ [CFG]: 'api_key = "sk_k"' }, 0o644), warn: (m) => warnings.push(m) });
   assert.equal(loose.values.api_key, 'sk_k');
@@ -93,4 +93,68 @@ test('the op child process inherits no key and no pointer to one', async () => {
   assert.equal(env.SHORT_IO_API_KEY, 'sk_S');
   assert.equal(seen[0].options.timeout, OP_TIMEOUT_MS);
   assert.equal('SHORT_IO_API_KEY' in opChildEnv({ SHORT_IO_API_KEY: 'x', PATH: '/p' }), false);
+});
+
+test('parseToml keeps section keys out of the top level', () => {
+  const { values, sections } = parseToml(['default = "b"', '[accounts.a]', 'api_key = "sk_a"', '[accounts.b] # the second', 'api_key = "sk_b"', 'op_account = team.1password.com # t'].join('\n'));
+  assert.deepEqual(values, { default: 'b' });
+  assert.deepEqual(sections.map((s) => [s.name, s.line, s.values]), [['a', 2, { api_key: 'sk_a' }], ['b', 4, { api_key: 'sk_b', op_account: 'team.1password.com' }]]);
+});
+
+test('parseToml reads folders as a string or a one-line array', () => {
+  const folders = (line) => parseToml(`[accounts.a]\n${line}`).sections[0].values.folders;
+  assert.equal(folders('folders = "~/code/one"'), '~/code/one');
+  assert.deepEqual(folders('folders = ["~/one", "/two/with, comma"]'), ['~/one', '/two/with, comma']);
+  assert.deepEqual(folders('folders = [ "~/one", ] # trailing comma and comment'), ['~/one']);
+  assert.deepEqual(folders('folders = []'), []);
+  assert.deepEqual(folders('folders = [ ]'), []);
+});
+
+test('parseToml reports an unreadable folders value with its section', () => {
+  const { skipped, sections } = parseToml('[accounts.a]\nfolders = [\n"~/one",\n]');
+  assert.deepEqual(skipped.map((s) => [s.line, s.key, s.section]), [[2, 'folders', 'a'], [3, undefined, 'a'], [4, undefined, 'a']]);
+  assert.equal('folders' in sections[0].values, false);
+});
+
+test('parseToml reads an array only for folders in a section', () => {
+  const top = parseToml('folders = ["~/one"]');
+  assert.deepEqual(top.values, {});
+  assert.equal(top.skipped[0].line, 1);
+  const other = parseToml('[accounts.a]\napi_key = ["sk_a"]');
+  assert.deepEqual(other.sections[0].values, {});
+  assert.equal(other.skipped[0].key, 'api_key');
+});
+
+test('parseToml records a repeated key in a section', () => {
+  const { sections } = parseToml('[accounts.a]\napi_key = "sk_1"\napi_key = "sk_2"');
+  assert.deepEqual(sections[0].repeats, ['api_key']);
+});
+
+test('the top level keeps its 0.1.0 last-one-wins rule', () => {
+  const { values } = parseToml('api_key = "sk_1"\napi_key = "sk_2"');
+  assert.deepEqual(values, { api_key: 'sk_2' });
+});
+
+test('parseToml skips any other section and keeps its keys out', () => {
+  for (const header of ['[other]', '[accounts.a.b]', '[[accounts.x]]', '[accounts.]', '[accounts."x"]', '[accounts.a b]', '[accounts.a] trailing']) {
+    const { values, sections, ignored, skipped } = parseToml(`default = "z"\n${header}\napi_key = "sk_stray"\nfolders = ["x"]`);
+    assert.deepEqual(values, { default: 'z' }, header);
+    assert.deepEqual(sections, [], header);
+    assert.deepEqual(ignored, [2], header);
+    assert.deepEqual(skipped, [], header);
+  }
+});
+
+test('a section after a skipped one reads normally', () => {
+  const { sections } = parseToml('[other]\napi_key = "sk_stray"\n[accounts.a]\napi_key = "sk_a"');
+  assert.deepEqual(sections.map((s) => s.values), [{ api_key: 'sk_a' }]);
+});
+
+test('readConfigFile warns about skipped lines and sections by number and never echoes a line', async () => {
+  const warnings = [];
+  const out = await readConfigFile({ env: {}, homedir: home, ...fileAt({ [CFG]: '[accounts.a]\napi_key = "sk_SECRET\n[other]\napi_key = "sk_SECRET2"' }), warn: (m) => warnings.push(m) });
+  assert.deepEqual(out.sections.map((s) => s.name), ['a']);
+  assert.equal(warnings.some((w) => /line 2/.test(w)), true);
+  assert.equal(warnings.some((w) => /line 3/.test(w) && /\[accounts\.<name>\]/.test(w)), true);
+  assert.equal(warnings.join('\n').includes('sk_SECRET'), false);
 });
