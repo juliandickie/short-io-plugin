@@ -324,3 +324,164 @@ test('a key in the settings field beside named accounts stops the CLI too', asyn
 test('usage names the --account flag', () => {
   assert.match(usage(), /--account <name>/);
 });
+
+test('whoami --json keeps every 0.1.0 field for the folder account and adds the account view', async () => {
+  const h = accounts({ cwd: '/srv/idd/x' });
+  assert.equal(await run(['whoami', '--json'], h.c), 0);
+  const j = JSON.parse(h.out.join(''));
+  assert.equal(j.key_source, 'file');
+  assert.deepEqual(j.domains, [{ id: 2, hostname: 'idd.example', linkType: 'eight-char', links: 1 }]);
+  assert.match(j.config_path, /short-io-plugin\/config\.toml$/);
+  assert.equal(typeof j.data_dir, 'string');
+  assert.equal(j.default, 'pm');
+  assert.equal(j.folder, '/srv/idd/x');
+  assert.equal(j.folder_account, 'idd');
+  assert.deepEqual(j.accounts, [
+    { name: 'pm', key_source: 'file', folders: [], domains: [{ id: 1, hostname: 'pm.example', linkType: 'random', links: 1 }], error: null },
+    { name: 'idd', key_source: 'file', folders: ['/srv/idd'], domains: [{ id: 2, hostname: 'idd.example', linkType: 'eight-char', links: 1 }], error: null },
+  ]);
+  assert.equal(h.out.join('').includes('sk_'), false);
+});
+
+test('whoami text names each account, the default and the folder account, never a key', async () => {
+  const h = accounts({ cwd: '/srv/idd/x' });
+  assert.equal(await run(['whoami'], h.c), 0);
+  const text = h.out.join('');
+  assert.match(text, /account: pm\nkey source: file\nfolders: none\n/);
+  assert.match(text, /account: idd\nkey source: file\nfolders: \/srv\/idd\n/);
+  assert.match(text, /pm\.example/);
+  assert.match(text, /idd\.example/);
+  assert.match(text, /default account: pm\n/);
+  assert.match(text, /MCP tools here: idd \(folder \/srv\/idd matches \/srv\/idd\/x\)/);
+  assert.ok(text.indexOf('account: idd') < text.indexOf('default account:'));
+  assert.equal(text.includes('sk_'), false);
+  assert.equal(h.err.join('').includes('sk_'), false);
+});
+
+test('whoami text says when no folder matched and the default answered', async () => {
+  const h = accounts();
+  assert.equal(await run(['whoami'], h.c), 0);
+  assert.match(h.out.join(''), /MCP tools here: pm \(no folder matched, using the default\)/);
+});
+
+test('a failing account gets an error field, the others still report, and whoami exits 1', async () => {
+  const h = accounts({ pm: { listDomains: async () => { throw new ShortIoError('auth', 'rejected'); } } });
+  assert.equal(await run(['whoami', '--json'], h.c), 1);
+  const j = JSON.parse(h.out.join(''));
+  assert.match(j.accounts[0].error, /rejected/);
+  assert.equal(j.accounts[0].key_source, 'file');
+  assert.deepEqual(j.accounts[0].domains, []);
+  assert.equal(j.accounts[1].error, null);
+  assert.equal(j.accounts[1].domains[0].hostname, 'idd.example');
+  const t = accounts({ pm: { listDomains: async () => { throw new ShortIoError('auth', 'rejected'); } } });
+  assert.equal(await run(['whoami'], t.c), 1);
+  assert.match(t.out.join(''), /account: pm\nkey source: file\nfolders: none\nerror: rejected\n/);
+  assert.match(t.out.join(''), /idd\.example/);
+});
+
+test('a key that will not resolve is that account\'s error in whoami, never printed', async () => {
+  const h = accounts({ config: TWO.replace('sk_PM', 'pk_BAD') });
+  assert.equal(await run(['whoami', '--json'], h.c), 1);
+  const j = JSON.parse(h.out.join(''));
+  assert.match(j.accounts[0].error, /Public key toggle/);
+  assert.equal(j.accounts[0].key_source, null);
+  assert.equal(j.accounts[1].domains.length, 1);
+  assert.equal(h.out.join('').includes('pk_BAD'), false);
+});
+
+test('whoami with no default and no matching folder says the bridge will not start', async () => {
+  const config = TWO.replace('default = "pm"', '');
+  const h = accounts({ config });
+  assert.equal(await run(['whoami', '--json'], h.c), 0);
+  const j = JSON.parse(h.out.join(''));
+  assert.equal(j.default, null);
+  assert.equal(j.folder_account, null);
+  assert.equal(j.key_source, null);
+  assert.deepEqual(j.domains, []);
+  assert.equal(j.accounts.length, 2);
+  const t = accounts({ config });
+  assert.equal(await run(['whoami'], t.c), 0);
+  assert.match(t.out.join(''), /default account: none/);
+  assert.match(t.out.join(''), /MCP tools here: none .*will not start/);
+});
+
+test('whoami --account shows that account only', async () => {
+  const h = accounts();
+  assert.equal(await run(['whoami', '--account', 'idd', '--json'], h.c), 0);
+  const j = JSON.parse(h.out.join(''));
+  assert.deepEqual(j.accounts.map((a) => a.name), ['idd']);
+  assert.equal(j.domains[0].hostname, 'idd.example');
+  assert.equal(j.folder_account, 'pm');
+  assert.deepEqual(h.opened, ['sk_IDD']);
+});
+
+test('single-key whoami adds the same JSON fields and keeps its text', async () => {
+  const h = ctx();
+  assert.equal(await run(['whoami', '--json'], h.c), 0);
+  const j = JSON.parse(h.out.join(''));
+  assert.equal(j.default, 'default');
+  assert.equal(j.folder, '/work');
+  assert.equal(j.folder_account, 'default');
+  assert.deepEqual(j.accounts.map((a) => [a.name, a.key_source, a.folders, a.error]), [['default', 'file', [], null]]);
+  const t = ctx();
+  assert.equal(await run(['whoami'], t.c), 0);
+  const lines = t.out.join('').split('\n');
+  assert.equal(lines[0], 'key source: file');
+  assert.match(lines[1], /^config path: /);
+  assert.match(lines[2], /^id\s+hostname\s+type\s+links$/);
+  assert.match(lines[3], /^12345\s+go\.example\.com\s+eight-char\s+2$/);
+  assert.equal(t.out.join('').includes('account:'), false);
+});
+
+test('single-key whoami keeps its exit codes and messages', async () => {
+  const { ConfigError } = await import('../lib/config.mjs');
+  const c = ctx({ ctx: { resolveKey: async () => { throw new ConfigError('pk_ key'); } } });
+  assert.equal(await run(['whoami'], c.c), 2);
+  assert.equal(c.err.join(''), 'short-io: pk_ key\n');
+  const a = ctx({ client: { listDomains: async () => { throw new ShortIoError('auth', 'rejected'); } } });
+  assert.equal(await run(['whoami', '--json'], a.c), 1);
+  assert.equal(a.err.join(''), 'short-io: rejected\n');
+  assert.equal(a.out.join(''), '');
+});
+
+test('domains lists every account, with an account column and JSON field', async () => {
+  const j = accounts();
+  assert.equal(await run(['domains', '--json'], j.c), 0);
+  assert.deepEqual(JSON.parse(j.out.join('')).map((d) => [d.account, d.hostname, d.id, d.linkType]), [['pm', 'pm.example', 1, 'random'], ['idd', 'idd.example', 2, 'eight-char']]);
+  const t = accounts();
+  assert.equal(await run(['domains'], t.c), 0);
+  const lines = t.out.join('').split('\n');
+  assert.match(lines[0], /^account\s+id\s+hostname\s+type\s+redirect404$/);
+  assert.match(lines[1], /^pm\s+1\s+pm\.example/);
+  assert.match(lines[2], /^idd\s+2\s+idd\.example/);
+});
+
+test('domains --account lists that account only', async () => {
+  const h = accounts();
+  assert.equal(await run(['domains', '--account', 'idd', '--json'], h.c), 0);
+  assert.deepEqual(JSON.parse(h.out.join('')).map((d) => d.account), ['idd']);
+  assert.deepEqual(h.opened, ['sk_IDD']);
+});
+
+test('a failing account is a row in domains, the others still list, and it exits 1', async () => {
+  const fail = { listDomains: async () => { throw new ShortIoError('auth', 'rejected'); } };
+  const j = accounts({ pm: fail });
+  assert.equal(await run(['domains', '--json'], j.c), 1);
+  const rows = JSON.parse(j.out.join(''));
+  assert.equal(rows[0].account, 'pm');
+  assert.match(rows[0].error, /rejected/);
+  assert.equal(rows[1].hostname, 'idd.example');
+  const t = accounts({ pm: fail });
+  assert.equal(await run(['domains'], t.c), 1);
+  assert.match(t.out.join(''), /^pm\s+error: rejected$/m);
+  assert.match(t.out.join(''), /idd\.example/);
+});
+
+test('single-key domains keeps its table and adds account to the JSON', async () => {
+  const t = ctx();
+  assert.equal(await run(['domains'], t.c), 0);
+  assert.match(t.out.join('').split('\n')[0], /^id\s+hostname\s+type\s+redirect404$/);
+  const j = ctx();
+  assert.equal(await run(['domains', '--json'], j.c), 0);
+  assert.deepEqual(JSON.parse(j.out.join('')), [{ ...DOMAINS[0], account: 'default' }]);
+});
