@@ -374,3 +374,45 @@ test('resolveBridgeKey refuses with no default and no matching folder', async ()
   const deps = { env: {}, homedir: home, ...fileAt({ [CFG]: '[accounts.a]\napi_key = "sk_a"\n[accounts.b]\napi_key = "sk_b"' }), realpath: async (p) => p, cwd: () => '/work' };
   await assert.rejects(resolveBridgeKey(deps), (e) => e instanceof ConfigError && /\/work/.test(e.message) && /default/.test(e.message) && /a, b/.test(e.message));
 });
+
+test('an environment key needs no readable config file, as in 0.1.0', async () => {
+  const unreadable = { readFile: async () => { throw Object.assign(new Error('EISDIR'), { code: 'EISDIR' }); }, stat: async () => ({ mode: 0o600 }) };
+  for (const name of ['SHORT_IO_API_KEY', 'CLAUDE_PLUGIN_OPTION_SHORT_IO_API_KEY']) {
+    const warnings = [];
+    const deps = { env: { [name]: 'sk_E' }, homedir: home, ...unreadable, cwd: () => '/work', warn: (m) => warnings.push(m) };
+    assert.equal((await loadAccounts(deps)).named, false);
+    assert.deepEqual(await resolveBridgeKey(deps), { key: 'sk_E', source: 'env' });
+    assert.match(warnings[0], /Cannot read/);
+    assert.equal(warnings.join('').includes('sk_E'), false);
+  }
+});
+
+test('with no environment key an unreadable file still stops, as in 0.1.0', async () => {
+  const unreadable = { readFile: async () => { throw Object.assign(new Error('EISDIR'), { code: 'EISDIR' }); }, stat: async () => ({ mode: 0o600 }) };
+  await assert.rejects(loadAccounts({ env: {}, homedir: home, ...unreadable, cwd: () => '/work' }), (e) => e instanceof ConfigError && /Cannot read/.test(e.message));
+  await assert.rejects(loadAccounts({ env: { SHORT_IO_KEY_OP_REF: 'op://V/I/f' }, homedir: home, ...unreadable, cwd: () => '/work' }), (e) => e instanceof ConfigError && /Cannot read/.test(e.message));
+});
+
+test('an environment key keeps a single-key file silent, as in 0.1.0', async () => {
+  const warnings = [];
+  const m = await loadAccounts({ env: { SHORT_IO_API_KEY: 'sk_E' }, homedir: home, ...fileAt({ [CFG]: 'api_key = "sk_F"\nbad line\n[other]' }, 0o644), cwd: () => '/work', warn: (w) => warnings.push(w) });
+  assert.equal(m.named, false);
+  assert.deepEqual(warnings, []);
+  const without = [];
+  await loadAccounts({ env: {}, homedir: home, ...fileAt({ [CFG]: 'api_key = "sk_F"' }, 0o644), cwd: () => '/work', warn: (w) => without.push(w) });
+  assert.match(without[0], /chmod 600/);
+});
+
+test('an environment key beside named accounts is still the conflict, loose mode or not', async () => {
+  await assert.rejects(loadAccounts({ env: { SHORT_IO_API_KEY: 'sk_E' }, homedir: home, ...fileAt({ [CFG]: TWO }, 0o644), cwd: () => '/work' }), (e) => e instanceof ConfigError && /settings field/.test(e.message));
+});
+
+test('a key pasted into the wrong place does not come back out in an error', async () => {
+  await assert.rejects(load('default = "sk_LEAK"\n[accounts.pm]\napi_key = "sk_PM"'), (e) => e instanceof ConfigError && /default/.test(e.message) && /Accounts: pm/.test(e.message) && !e.message.includes('sk_LEAK'));
+  await assert.rejects(load('[accounts.pm]\napi_key = "sk_PM"\nfolders = ["sk_LEAK"]'), (e) => e instanceof ConfigError && /\[accounts\.pm\]/.test(e.message) && !e.message.includes('sk_LEAK'));
+  await assert.rejects(load('default = "pk_LEAK"\n[accounts.pm]\napi_key = "sk_PM"'), (e) => !e.message.includes('pk_LEAK'));
+});
+
+test('a deleted working folder with named accounts says what to do', async () => {
+  await assert.rejects(load(TWO, { cwd: () => { throw new Error('ENOENT: uv_cwd'); } }), (e) => e instanceof ConfigError && /working folder/.test(e.message) && /Run this from a folder that exists/.test(e.message));
+});

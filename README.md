@@ -203,7 +203,7 @@ after a timeout without checking first whether it already landed.
 | Command | The problem it solves |
 |---|---|
 | `whoami [--json]` | Proves each key works, says which of the four methods supplied it, and names the account this folder's MCP tools use |
-| `domains [--json]` | The numeric id and the hostname together, because the read and statistics tools want the id and create wants the hostname. Names the account when there are two or more |
+| `domains [--json]` | The numeric id and the hostname together, because the read and statistics tools want the id and create wants the hostname. Names the account when the config file has named accounts |
 | `links <domain\|id> [--json\|--csv] [--include-archived]` | Every link on the domain, paged past the 150 row limit to the true total, which the hosted list tool leaves you to page yourself |
 | `check <domain/slug \| https://host/slug> [--json]` | What the slug is actually configured to do, the live hop, and whether the domain 404s or falls back, which no HTTP status can tell you |
 | `create <domain> <url> [--path s] [--title t] [--tags a,b] [--allow-duplicate] [--json]` | A create that checks the slug and the destination first, so a silently returned existing record is reported as `exists`, never as new |

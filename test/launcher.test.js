@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { resolveBridgeKey } from '../lib/config.mjs';
@@ -246,6 +246,21 @@ test('by default the bridge uses the folder-aware resolver', async () => {
     const code = await main({ ...deps, env: { SHORT_IO_PLUGIN_DATA: '/data', SHORT_IO_API_KEY: 'sk_E', XDG_CONFIG_HOME: home }, stderr: { write: (t) => h.errs.push(t) } });
     assert.equal(code, 2);
     assert.match(h.errs.join(''), /settings field/);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test('by default the bridge reads the real working folder', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'short-io-launcher-'));
+  try {
+    await mkdir(path.join(home, 'short-io-plugin'));
+    const here = await realpath(process.cwd());
+    await writeFile(path.join(home, 'short-io-plugin', 'config.toml'), `default = "other"\n[accounts.other]\napi_key = "sk_OTHER"\n[accounts.here]\napi_key = "sk_HERE"\nfolders = ["${here}"]\n`, { mode: 0o600 });
+    const h = base({ resolve: undefined, env: { SHORT_IO_PLUGIN_DATA: '/data', XDG_CONFIG_HOME: home } });
+    assert.equal(await main(h.deps), 0);
+    assert.equal(h.writes[0].text, 'Authorization: sk_HERE\n');
+    assert.match(h.errs.join(''), /account here/);
   } finally {
     await rm(home, { recursive: true, force: true });
   }
