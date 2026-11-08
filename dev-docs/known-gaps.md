@@ -49,3 +49,14 @@ client treated it as an error. The 0.1.0 audit recorded only the case with a mat
 smoke used a destination that already had links, so neither saw it. The 0.2.0 dry run found it
 on both accounts. Only the exact message counts as "no links", so a reworded message fails loud
 and cannot create a duplicate link.
+
+## 2026-11-08 - fixed in 0.2.1 docs - a blank settings field is not cleared
+
+After 0.2.0 installed, the maintainer cleared the plugin settings fields in `/plugin manage`, and
+every new session's bridge kept refusing for three days. `claude plugin configure` still listed
+the API key field as "sensitive, set". Piping a blank value to `claude plugin configure
+--values-stdin` answered "No configuration changes", and a null value is refused ("The input on stdin isn't a
+JSON object of strings"). A
+reinstall with `--keep-data` cleared it. The docs and the error message now give that step.
+Possible plugin-side fix, not taken - ignore a settings key that equals one of the named accounts'
+keys, which would reverse the rule that any setting beside named accounts is an error.

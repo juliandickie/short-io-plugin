@@ -132,7 +132,10 @@ behaviour rather than a documented contract, so check `whoami` when it matters.
 **The settings fields must be empty.** A key in the plugin settings field or in
 `SHORT_IO_API_KEY` beside named accounts is an error in both surfaces, because the two keys
 could silently compete. The same goes for the 1Password fields and variables. The bridge
-refuses to start and the CLI exits 2, and both say what to change.
+refuses to start and the CLI exits 2, and both say what to change. Saving the API key field
+blank does not clear it, so reinstall the plugin to clear it
+(`claude plugin uninstall short-io@<marketplace> --keep-data`, then `claude plugin install
+short-io@<marketplace>`), and check with `claude plugin configure short-io@<marketplace>`.
 
 These are errors too, each with the fix in the message.
 
@@ -151,8 +154,8 @@ Any other `[section]` there is skipped with a warning, and its keys are ignored.
 that does not exist gets a warning, so a typo cannot quietly send a session to the default.
 
 To move from one key to two, put `[accounts.<name>]` above your existing `api_key` line, add
-the second section and any `folders`, add `default = "<name>"` as the first line, clear the
-plugin settings fields, then restart and run `whoami`. `/short-io:setup` has the steps.
+the second section and any `folders`, add `default = "<name>"` as the first line, empty the
+plugin settings fields by reinstalling the plugin, then restart and run `whoami`. `/short-io:setup` has the steps.
 
 ## The bare-key gotcha
 
@@ -260,7 +263,7 @@ The bulk results CSV columns are `row,url,path,action,short_url,id,note`.
 | `Unauthorized: No API key provided` | The header was malformed or the value was empty, so the key itself may be fine. Check for a `Bearer ` prefix and for an empty config value |
 | A message about a `pk_` key | A public key was supplied. Create a secret key with the "Public key" toggle OFF |
 | `no API key configured` | None of the four methods answered. Re-check the key section above, then re-run `whoami` |
-| The MCP tools do not start, with a message about `[accounts.*]` sections and the settings field | A key is in the plugin settings field or the environment beside named accounts. Move it into a section and clear the field |
+| The MCP tools do not start, with a message about `[accounts.*]` sections and the settings field | A key is in the plugin settings field or the environment beside named accounts. Move it into a section, then reinstall the plugin with `--keep-data`, because a field saved blank is not cleared |
 | `get-domains` does not list a domain you own | The domain belongs to another account, and the MCP tools serve this folder's account only. Use the CLI, or open a session in that account's folder |
 | `No account owns domain` | No configured key can see that domain. The message lists each account and its domains |
 | `mcp-remote is not installed` | The SessionStart hook has not run or failed. Run `scripts/install-deps.sh` from the plugin directory, then restart |
