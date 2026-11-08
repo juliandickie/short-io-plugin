@@ -1,13 +1,13 @@
 {
   "name": "short-io-plugin",
   "owner": { "name": "Julian Dickie", "url": "https://github.com/juliandickie" },
-  "metadata": { "description": "Short.io link management for Claude Code", "version": "0.2.1" },
+  "metadata": { "description": "Short.io link management for Claude Code", "version": "0.2.2" },
   "plugins": [
     {
       "name": "short-io",
       "source": "./",
       "description": "Short.io link management under your own API key - hosted MCP tools plus a CLI for full enumeration, destination checks, deduped bulk create and delete.",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "author": { "name": "Julian Dickie" },
       "homepage": "https://github.com/juliandickie/short-io-plugin",
       "repository": "https://github.com/juliandickie/short-io-plugin",

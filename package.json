@@ -1,6 +1,6 @@
 {
   "name": "short-io-plugin",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "description": "Claude Code plugin - Short.io link management (hosted MCP bridge plus a REST gap CLI)",

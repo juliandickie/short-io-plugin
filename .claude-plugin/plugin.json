@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "short-io",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Short.io link management under your own API key - create, edit, search and measure short links through Short.io's hosted MCP tools, plus a CLI that lists every link on a domain, checks what a slug really points at, bulk-creates from CSV with duplicate detection, and deletes. Activates for: (1) creating or editing a short link, (2) finding which slug points where, (3) bulk link creation from a spreadsheet, (4) auditing a short domain, (5) click and referrer statistics, (6) first-run key setup.",
   "author": { "name": "Julian Dickie" },
   "license": "MIT",
