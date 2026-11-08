@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+Changed - the settings error now says to unset a shell variable first, then to reinstall for the
+plugin settings field. The CLI never sees that field, so a CLI user's variable always comes from
+their shell.
+
 ## 0.2.1 - 2026-11-08
 
 Fixed - the setup steps said to clear the plugin settings fields in `/plugin manage`, but Claude

@@ -243,7 +243,7 @@ test('the same folder twice under one account is harmless', async () => {
 test('error - each settings variable beside account sections, by name and never by value', async () => {
   assert.equal(SECRET_ENV.length, 6);
   for (const name of SECRET_ENV) {
-    await assert.rejects(load(TWO, { env: { [name]: 'sk_VALUE' } }), (e) => e instanceof ConfigError && e.message.includes(name) && /settings field/.test(e.message) && /\[accounts\.<name>\]/.test(e.message) && /uninstall short-io@<marketplace> --keep-data/.test(e.message) && !e.message.includes('sk_VALUE'));
+    await assert.rejects(load(TWO, { env: { [name]: 'sk_VALUE' } }), (e) => e instanceof ConfigError && e.message.includes(name) && /settings field/.test(e.message) && /\[accounts\.<name>\]/.test(e.message) && /uninstall short-io@<marketplace> --keep-data/.test(e.message) && e.message.indexOf('unset it') < e.message.indexOf('uninstall') && !e.message.includes('sk_VALUE'));
   }
 });
 

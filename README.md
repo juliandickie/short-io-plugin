@@ -133,9 +133,7 @@ behaviour rather than a documented contract, so check `whoami` when it matters.
 `SHORT_IO_API_KEY` beside named accounts is an error in both surfaces, because the two keys
 could silently compete. The same goes for the 1Password fields and variables. The bridge
 refuses to start and the CLI exits 2, and both say what to change. Saving the API key field
-blank does not clear it, so reinstall the plugin to clear it
-(`claude plugin uninstall short-io@<marketplace> --keep-data`, then `claude plugin install
-short-io@<marketplace>`), and check with `claude plugin configure short-io@<marketplace>`.
+blank does not clear it, so `/short-io:setup` section 3 gives the reinstall that does.
 
 These are errors too, each with the fix in the message.
 
