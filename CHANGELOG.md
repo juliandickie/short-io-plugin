@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 - 2026-11-08
+
+Fixed - the setup steps said to clear the plugin settings fields in `/plugin manage`, but Claude
+Code keeps a sensitive field that is saved blank, so the API key field never cleared and the MCP
+bridge kept refusing beside named accounts. The setup skill, the README and the error message
+now say to reinstall the plugin with `--keep-data`, which is the step that cleared it, and to
+check with `claude plugin configure short-io@<marketplace>`.
+
 ## 0.2.0 - 2026-11-05
 
 Multi-account support, for anyone with more than one Short.io account. One-key setups keep

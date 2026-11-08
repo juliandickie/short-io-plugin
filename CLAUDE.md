@@ -72,7 +72,9 @@ That precedence applies only to a single-key setup. Once the config file has `[a
 sections, there is no precedence at all, because any of the three Short.io settings in the
 environment is an error (`loadAccounts`, in the bridge and the CLI). The settings field reaches
 only the bridge and never the Bash tool, so letting it win would put the MCP tools and the CLI
-in one session on different accounts with nothing to say so.
+in one session on different accounts with nothing to say so. Claude Code keeps a sensitive
+field that is saved blank, so the only way to empty it is a reinstall (proved 2026-11-08), and
+the error says so.
 
 The bridge picks its account from its working folder, which is observed behaviour rather than a
 documented contract (19 bridges checked with `lsof`, 2026-11-05), so `whoami` and the bridge's

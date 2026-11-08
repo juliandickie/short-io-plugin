@@ -94,11 +94,31 @@ To move from one key to two, follow these steps.
 3. Add a second `[accounts.<name>]` section below it, with the second `api_key`.
 4. Add a `folders` line to each account that owns a folder.
 5. Add `default = "<name>"` as the first line of the file, above every section.
-6. Clear all three Short.io fields in `/plugin manage`, and unset `SHORT_IO_API_KEY` in your
-   shell. **Warning** - the CLI stops and the MCP bridge refuses to start while any of them is
-   set beside named accounts, because two keys could silently compete.
-7. Restart the session.
-8. Run the `whoami` command in the Verify step, and read which account each domain is under.
+6. Unset `SHORT_IO_API_KEY` in your shell, if you set it there. **Warning** - the CLI stops and
+   the MCP bridge refuses to start while any Short.io setting is set beside named accounts,
+   because two keys could silently compete.
+7. Show the plugin's settings. Use the marketplace name that `claude plugin list` shows for
+   short-io.
+
+   ```bash
+   claude plugin configure short-io@<marketplace>
+   ```
+
+8. If any line reads "set", reinstall the plugin and keep its data. **Caution** - saving a field
+   blank in `/plugin manage` does not clear it. A blank value piped to `claude plugin configure`
+   changes nothing, and a null value is refused. Only the reinstall clears the API key field (proved 2026-11-08).
+
+   ```bash
+   claude plugin uninstall short-io@<marketplace> --keep-data
+   ```
+
+   ```bash
+   claude plugin install short-io@<marketplace>
+   ```
+
+9. Show the settings again, and make sure that every line reads "not set".
+10. Restart the session.
+11. Run the `whoami` command in the Verify step, and read which account each domain is under.
 
 ## 4 Remove a stale MCP entry
 
@@ -143,7 +163,7 @@ of that one account.
 | `mcp-remote is not installed` | The SessionStart hook has not run or failed. Run `scripts/install-deps.sh` from the plugin directory, then restart. |
 | A message about a `pk_` key | A public key was supplied. Create a secret key with the "Public key" toggle OFF. |
 | `no API key configured` | None of the four sources answered. Re-check step 2, then re-run `whoami`. |
-| `... is set ... while ... has [accounts.*] sections` | A key is in the plugin settings field or the environment beside named accounts. Move it into an `[accounts.<name>]` section and clear the field. The message names the variable, never its value. |
+| `... is set ... while ... has [accounts.*] sections` | A key is in the plugin settings field or the environment beside named accounts. Move it into an `[accounts.<name>]` section, then reinstall the plugin with `--keep-data` (section 3, step 8), because a blank field is not cleared. The message names the variable, never its value. |
 | `No account for <folder>` | There is more than one account, no `default`, and no account lists this folder, so the bridge will not start here. Add `default`, or add the folder to an account. |
 | `No account owns domain` | No configured key can see that domain. The message lists each account and its domains. |
 | `No domain X on this account` with `--account` | The named account does not own that domain. Drop `--account` to let the CLI find the owner. |
